@@ -5,131 +5,269 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Urbana - Administración de Condominios</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
 
-  <div class="max-w-md w-full bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
-    <div class="text-center mb-6">
-      <h1 class="text-2xl font-bold text-sky-400">Urbana</h1>
-      <p class="text-slate-400 text-sm">Administración de Condominios</p>
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold text-xl">U</div>
+        <div>
+          <h1 class="font-bold text-lg leading-none">Urbana</h1>
+          <p class="text-xs text-slate-400 mt-1">Terraza 12</p>
+        </div>
+      </div>
+      <div id="userSection" class="hidden flex items-center space-x-4">
+        <span id="userEmail" class="text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700"></span>
+        <button id="logoutBtn" class="text-xs text-rose-400 hover:text-rose-300 font-medium">Cerrar Sesión</button>
+      </div>
     </div>
+  </header>
 
-    <!-- Panel de Control de Carga Inicial -->
-    <div id="app-content" class="space-y-4">
-      <p class="text-slate-300 text-sm text-center">
-        Haz clic abajo para crear la estructura base de <strong>Terraza 12</strong> y registrar los 30 apartamentos en Firestore.
-      </p>
-
-      <button id="btn-inicializar" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-semibold py-3 px-4 rounded-xl transition">
-        🚀 Inicializar Condominio Terraza 12
+  <!-- Login Section -->
+  <main id="loginView" class="max-w-md mx-auto px-4 py-20">
+    <div class="bg-slate-800/50 border border-slate-700/50 p-8 rounded-2xl shadow-xl text-center">
+      <h2 class="text-2xl font-bold text-white mb-2">Bienvenido a Urbana</h2>
+      <p class="text-sm text-slate-400 mb-8">Inicia sesión con tu cuenta de administrador para gestionar Terraza 12.</p>
+      
+      <button id="googleLoginBtn" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center space-x-2">
+        <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+          <path d="M12.24 10.285V13.4h6.887c-.58 2.719-2.855 4.714-6.887 4.714-4.14 0-7.5-3.36-7.5-7.5s3.36-7.5 7.5-7.5c1.88 0 3.597.69 4.92 1.83l2.42-2.42C17.65 1.03 15.11 0 12.24 0 5.64 0 0 5.64 0 12.24s5.64 12.24 12.24 12.24c6.91 0 11.52-4.86 11.52-11.72 0-.79-.08-1.55-.21-2.28H12.24z"/>
+        </svg>
+        <span>Iniciar Sesión con Google</span>
       </button>
 
-      <div id="log-status" class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-slate-400 h-32 overflow-y-auto">
-        > Esperando acción...
+      <p id="loginError" class="text-xs text-rose-400 mt-4 hidden"></p>
+    </div>
+  </main>
+
+  <!-- Dashboard Section -->
+  <main id="dashboardView" class="hidden max-w-7xl mx-auto px-4 py-8">
+    
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
+        <p class="text-xs text-slate-400">Total Apartamentos</p>
+        <p class="text-2xl font-bold text-white mt-1">30</p>
       </div>
+      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
+        <p class="text-xs text-slate-400">Al Día</p>
+        <p id="statAlDia" class="text-2xl font-bold text-emerald-400 mt-1">0</p>
+      </div>
+      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
+        <p class="text-xs text-slate-400">Con Deuda</p>
+        <p id="statDeuda" class="text-2xl font-bold text-rose-400 mt-1">0</p>
+      </div>
+      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
+        <p class="text-xs text-slate-400">Vacíos</p>
+        <p id="statVacio" class="text-2xl font-bold text-amber-400 mt-1">0</p>
+      </div>
+    </div>
+
+    <!-- Filters & Actions -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <h3 class="text-xl font-bold text-white">Apartamentos de Terraza 12</h3>
+      <div class="flex items-center space-x-2">
+        <button onclick="filterApartments('todos')" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300">Todos</button>
+        <button onclick="filterApartments('al_dia')" class="px-3 py-1.5 text-xs font-medium bg-emerald-950/40 border border-emerald-800/50 hover:bg-emerald-900/50 rounded-lg text-emerald-400">Al Día</button>
+        <button onclick="filterApartments('con_deuda')" class="px-3 py-1.5 text-xs font-medium bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/50 rounded-lg text-rose-400">Con Deuda</button>
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div id="apartmentsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3">
+      <div class="col-span-full text-center py-12 text-slate-500">Cargando datos...</div>
+    </div>
+  </main>
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <h4 class="text-lg font-bold text-white mb-4">Editar Apt. <span id="modalAptId"></span></h4>
+      <form id="editForm" class="space-y-4">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Nombre Propietario</label>
+          <input type="text" id="inputPropietario" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Teléfono</label>
+          <input type="text" id="inputTelefono" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">Estado de Pago</label>
+          <select id="selectEstado" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            <option value="al_dia">Al Día</option>
+            <option value="con_deuda">Con Deuda</option>
+            <option value="vacio">Vacío / Desocupado</option>
+          </select>
+        </div>
+        <div class="flex justify-end space-x-3 pt-4">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white">Cancelar</button>
+          <button type="submit" class="px-4 py-2 text-xs font-medium bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg">Guardar Cambios</button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <!-- Firebase SDK v10 (Versión Modular Web) -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, doc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-    // Configuración oficial de Urbana
+  <script>
+    // Configuración Firebase
     const firebaseConfig = {
-      apiKey: "AIzaSyCUsuks448K-yPSffZdDOSYn7udIrEQKDU",
-      authDomain: "urbana-7e2dd.firebaseapp.com",
-      projectId: "urbana-7e2dd",
-      storageBucket: "urbana-7e2dd.firebasestorage.app",
-      messagingSenderId: "330922344810",
-      appId: "1:330922344810:web:b613ed65bdab395aa46513"
+      apiKey: "AIzaSyD-placeholder",
+      authDomain: "bv-trip.firebaseapp.com",
+      projectId: "bv-trip",
+      storageBucket: "bv-trip.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abc"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
-    const btnInicializar = document.getElementById('btn-inicializar');
-    const logStatus = document.getElementById('log-status');
+    let currentApartments = [];
+    let activeFilter = 'todos';
+    let selectedAptDocId = null;
 
-    function log(msg) {
-      logStatus.innerHTML += `<br>> ${msg}`;
-      logStatus.scrollTop = logStatus.scrollHeight;
+    // Control Auth State
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('dashboardView').classList.remove('hidden');
+        document.getElementById('userSection').classList.remove('hidden');
+        document.getElementById('userEmail').innerText = user.email;
+        loadApartments();
+      } else {
+        document.getElementById('loginView').classList.remove('hidden');
+        document.getElementById('dashboardView').classList.add('hidden');
+        document.getElementById('userSection').classList.add('hidden');
+      }
+    });
+
+    // Login Google
+    document.getElementById('googleLoginBtn').addEventListener('click', () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider).catch(error => {
+        const errorEl = document.getElementById('loginError');
+        errorEl.innerText = error.message;
+        errorEl.classList.remove('hidden');
+      });
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      auth.signOut();
+    });
+
+    // Cargar Apartamentos
+    function loadApartments() {
+      db.collection('condominios').doc('terraza_12').collection('apartamentos')
+        .onSnapshot(snapshot => {
+          currentApartments = [];
+          snapshot.forEach(doc => {
+            currentApartments.push({ id: doc.id, ...doc.data() });
+          });
+          // Ordenar numéricamente por ID
+          currentApartments.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+          renderDashboard();
+        }, error => {
+          console.error("Error al cargar apartamentos:", error);
+          alert("Error de permisos. Asegúrate de haber iniciado sesión con el correo autorizado (soyjesusu@gmail.com).");
+        });
     }
 
-    btnInicializar.addEventListener('click', async () => {
-      btnInicializar.disabled = true;
-      btnInicializar.classList.add('opacity-50');
-      log("Iniciando creación de Terraza 12...");
+    // Renderizar Interfaz
+    function renderDashboard() {
+      const grid = document.getElementById('apartmentsGrid');
+      grid.innerHTML = '';
 
-      try {
-        const ID_CONDOMINIO = "terraza12";
+      let alDia = 0, deuda = 0, vacio = 0;
 
-        // 1. Crear documento principal del condominio
-        await setDoc(doc(db, "condominios", ID_CONDOMINIO), {
-          nombre: "Condominio Terraza 12",
-          rif: "J-00000000-0",
-          direccion: "Caracas, Venezuela",
-          monedaPrincipal: "USD",
-          administradorEmail: "veriuschkamicanal@gmail.com",
-          superAdminEmail: "soyjesusu@gmail.com",
-          fechaCreacion: new Date(),
-          activo: true
-        });
-        log(" Documento principal de Terraza 12 creado.");
+      const filtered = currentApartments.filter(apt => {
+        if (apt.estado === 'al_dia') alDia++;
+        if (apt.estado === 'con_deuda') deuda++;
+        if (apt.estado === 'vacio') vacio++;
 
-        // 2. Registrar Administrador y SuperAdmin
-        const batch = writeBatch(db);
+        if (activeFilter === 'todos') return true;
+        return apt.estado === activeFilter;
+      });
 
-        const adminRef = doc(db, `condominios/${ID_CONDOMINIO}/miembros`, "veriuschkamicanal@gmail.com");
-        batch.set(adminRef, {
-          nombre: "Veriuschka (Admin)",
-          email: "veriuschkamicanal@gmail.com",
-          rol: "administrador",
-          apartamento: "Oficina Admin",
-          activo: true
-        });
+      document.getElementById('statAlDia').innerText = alDia;
+      document.getElementById('statDeuda').innerText = deuda;
+      document.getElementById('statVacio').innerText = vacio;
 
-        const superAdminRef = doc(db, `condominios/${ID_CONDOMINIO}/miembros`, "soyjesusu@gmail.com");
-        batch.set(superAdminRef, {
-          nombre: "Jesús Fernández (SuperAdmin)",
-          email: "soyjesusu@gmail.com",
-          rol: "superadmin",
-          apartamento: "Sistemas",
-          activo: true
-        });
+      filtered.forEach(apt => {
+        let badgeBg = 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400';
+        let statusText = 'Al día';
 
-        // 3. Crear 30 apartamentos (Pisos 1 al 10, letras A, B, C)
-        let contadorAptos = 0;
-        for (let piso = 1; piso <= 10; piso++) {
-          ["A", "B", "C"].forEach(letra => {
-            contadorAptos++;
-            const numApto = `Apt ${piso}${letra}`;
-            const emailSimulado = `vecino.${piso}${letra.toLowerCase()}@terraza12.com`;
-
-            const aptoRef = doc(db, `condominios/${ID_CONDOMINIO}/miembros`, emailSimulado);
-            batch.set(aptoRef, {
-              nombre: `Propietario ${numApto}`,
-              email: emailSimulado,
-              apartamento: numApto,
-              rol: "propietario",
-              alicuota: 3.33,
-              saldoPendiente: 0,
-              estadoCuenta: "al_dia",
-              activo: true,
-              fechaRegistro: new Date()
-            });
-          });
+        if (apt.estado === 'con_deuda') {
+          badgeBg = 'bg-rose-500/10 border-rose-500/30 text-rose-400';
+          statusText = 'Deuda';
+        } else if (apt.estado === 'vacio') {
+          badgeBg = 'bg-amber-500/10 border-amber-500/30 text-amber-400';
+          statusText = 'Vacío';
         }
 
-        await batch.commit();
-        log(` Se crearon con éxito los ${contadorAptos} apartamentos.`);
-        log(" ¡Proceso completado con éxito!");
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800/60 border border-slate-700/60 hover:border-sky-500/50 p-4 rounded-xl cursor-pointer transition duration-150 flex flex-col justify-between';
+        card.onclick = () => openEditModal(apt);
 
-      } catch (error) {
-        log(` Error: ${error.message}`);
-        btnInicializar.disabled = false;
-        btnInicializar.classList.remove('opacity-50');
-      }
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <span class="font-bold text-lg text-white">Apt ${apt.numero || apt.id}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full border ${badgeBg}">${statusText}</span>
+            </div>
+            <p class="text-xs text-slate-300 font-medium truncate">${apt.propietario || 'Sin asignar'}</p>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-3 truncate">${apt.telefono || 'Sin teléfono'}</p>
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    function filterApartments(filter) {
+      activeFilter = filter;
+      renderDashboard();
+    }
+
+    function openEditModal(apt) {
+      selectedAptDocId = apt.id;
+      document.getElementById('modalAptId').innerText = apt.numero || apt.id;
+      document.getElementById('inputPropietario').value = apt.propietario || '';
+      document.getElementById('inputTelefono').value = apt.telefono || '';
+      document.getElementById('selectEstado').value = apt.estado || 'al_dia';
+      document.getElementById('editModal').classList.remove('hidden');
+      document.getElementById('editModal').classList.add('flex');
+    }
+
+    function closeModal() {
+      document.getElementById('editModal').classList.add('hidden');
+      document.getElementById('editModal').classList.remove('flex');
+    }
+
+    document.getElementById('editForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!selectedAptDocId) return;
+
+      const newPropietario = document.getElementById('inputPropietario').value;
+      const newTelefono = document.getElementById('inputTelefono').value;
+      const newEstado = document.getElementById('selectEstado').value;
+
+      db.collection('condominios').doc('terraza_12').collection('apartamentos').doc(selectedAptDocId).update({
+        propietario: newPropietario,
+        telefono: newTelefono,
+        estado: newEstado
+      }).then(() => {
+        closeModal();
+      }).catch(err => {
+        alert("Error al guardar cambios: " + err.message);
+      });
     });
   </script>
 </body>
