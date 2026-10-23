@@ -99,6 +99,10 @@
           <input type="text" id="inputTelefono" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
         </div>
         <div>
+          <label class="block text-xs text-slate-400 mb-1">Correo Gmail del propietario</label>
+          <input type="email" id="inputCorreo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+        </div>
+        <div>
           <label class="block text-xs text-slate-400 mb-1">Estado de Pago</label>
           <select id="selectEstado" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
             <option value="al_dia">Al Día</option>
@@ -117,12 +121,12 @@
   <script>
     // Configuración Firebase
     const firebaseConfig = {
-      apiKey: "AIzaSyD-placeholder",
-      authDomain: "bv-trip.firebaseapp.com",
-      projectId: "bv-trip",
-      storageBucket: "bv-trip.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "1:123456789:web:abc"
+      apiKey: "AIzaSyCUsuks448K-yPSffZdDOSYn7udIrEQKDU",
+      authDomain: "urbana-7e2dd.firebaseapp.com",
+      projectId: "urbana-7e2dd",
+      storageBucket: "urbana-7e2dd.firebasestorage.app",
+      messagingSenderId: "330922344810",
+      appId: "1:330922344810:web:b613ed65bdab395aa46513"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -165,7 +169,7 @@
 
     // Cargar Apartamentos
     function loadApartments() {
-      db.collection('condominios').doc('terraza_12').collection('apartamentos')
+      db.collection('condominios').doc('terraza12').collection('apartamentos')
         .onSnapshot(snapshot => {
           currentApartments = [];
           snapshot.forEach(doc => {
@@ -176,7 +180,7 @@
           renderDashboard();
         }, error => {
           console.error("Error al cargar apartamentos:", error);
-          alert("Error de permisos. Asegúrate de haber iniciado sesión con el correo autorizado (soyjesusu@gmail.com).");
+          alert("Tu cuenta no tiene permiso para ver este condominio. Si crees que es un error, avisa al administrador.");
         });
     }
 
@@ -184,6 +188,11 @@
     function renderDashboard() {
       const grid = document.getElementById('apartmentsGrid');
       grid.innerHTML = '';
+
+      if (currentApartments.length === 0) {
+        grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400">Todavía no hay apartamentos registrados.<br><button onclick="crearApartamentos()" class="mt-4 px-4 py-2 text-xs font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-lg">Crear apartamentos 1 al 30</button></div>';
+        return;
+      }
 
       let alDia = 0, deuda = 0, vacio = 0;
 
@@ -231,6 +240,16 @@
       });
     }
 
+    function crearApartamentos() {
+      if (!confirm('Se crearán los apartamentos 1 al 30 de Terraza 12, todos vacíos. ¿Continuar?')) return;
+      const batch = db.batch();
+      for (let n = 1; n <= 30; n++) {
+        batch.set(db.collection('condominios').doc('terraza12').collection('apartamentos').doc(String(n)),
+          { numero: String(n), propietario: '', telefono: '', correo: '', estado: 'vacio' });
+      }
+      batch.commit().catch(err => alert('Error al crear los apartamentos: ' + err.message));
+    }
+
     function filterApartments(filter) {
       activeFilter = filter;
       renderDashboard();
@@ -241,6 +260,7 @@
       document.getElementById('modalAptId').innerText = apt.numero || apt.id;
       document.getElementById('inputPropietario').value = apt.propietario || '';
       document.getElementById('inputTelefono').value = apt.telefono || '';
+      document.getElementById('inputCorreo').value = apt.correo || '';
       document.getElementById('selectEstado').value = apt.estado || 'al_dia';
       document.getElementById('editModal').classList.remove('hidden');
       document.getElementById('editModal').classList.add('flex');
@@ -257,11 +277,13 @@
 
       const newPropietario = document.getElementById('inputPropietario').value;
       const newTelefono = document.getElementById('inputTelefono').value;
+      const newCorreo = document.getElementById('inputCorreo').value.trim().toLowerCase();
       const newEstado = document.getElementById('selectEstado').value;
 
-      db.collection('condominios').doc('terraza_12').collection('apartamentos').doc(selectedAptDocId).update({
+      db.collection('condominios').doc('terraza12').collection('apartamentos').doc(selectedAptDocId).update({
         propietario: newPropietario,
         telefono: newTelefono,
+        correo: newCorreo,
         estado: newEstado
       }).then(() => {
         closeModal();
