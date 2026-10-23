@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Urbana - Administración de Condominios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
+
+  <div class="max-w-md w-full bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
+    <div class="text-center mb-6">
+      <h1 class="text-2xl font-bold text-sky-400">Urbana</h1>
+      <p class="text-slate-400 text-sm">Administración de Condominios</p>
+    </div>
+
+    <!-- Panel de Control de Carga Inicial -->
+    <div id="app-content" class="space-y-4">
+      <p class="text-slate-300 text-sm text-center">
+        Haz clic abajo para crear la estructura base de <strong>Terraza 12</strong> y registrar los 30 apartamentos en Firestore.
+      </p>
+
+      <button id="btn-inicializar" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-semibold py-3 px-4 rounded-xl transition">
+        🚀 Inicializar Condominio Terraza 12
+      </button>
+
+      <div id="log-status" class="bg-slate-950 p-3 rounded-lg text-xs font-mono text-slate-400 h-32 overflow-y-auto">
+        > Esperando acción...
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK v10 (Versión Modular Web) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, doc, setDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // Configuración oficial de Urbana
+    const firebaseConfig = {
+      apiKey: "AIzaSyCUsuks448K-yPSffZdDOSYn7udIrEQKDU",
+      authDomain: "urbana-7e2dd.firebaseapp.com",
+      projectId: "urbana-7e2dd",
+      storageBucket: "urbana-7e2dd.firebasestorage.app",
+      messagingSenderId: "330922344810",
+      appId: "1:330922344810:web:b613ed65bdab395aa46513"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const btnInicializar = document.getElementById('btn-inicializar');
+    const logStatus = document.getElementById('log-status');
+
+    function log(msg) {
+      logStatus.innerHTML += `<br>> ${msg}`;
+      logStatus.scrollTop = logStatus.scrollHeight;
+    }
+
+    btnInicializar.addEventListener('click', async () => {
+      btnInicializar.disabled = true;
+      btnInicializar.classList.add('opacity-50');
+      log("Iniciando creación de Terraza 12...");
+
+      try {
+        const ID_CONDOMINIO = "terraza12";
+
+        // 1. Crear documento principal del condominio
+        await setDoc(doc(db, "condominios", ID_CONDOMINIO), {
+          nombre: "Condominio Terraza 12",
+          rif: "J-00000000-0",
+          direccion: "Caracas, Venezuela",
+          monedaPrincipal: "USD",
+          administradorEmail: "veriuschkamicanal@gmail.com",
+          superAdminEmail: "soyjesusu@gmail.com",
+          fechaCreacion: new Date(),
+          activo: true
+        });
+        log(" Documento principal de Terraza 12 creado.");
+
+        // 2. Registrar Administrador y SuperAdmin
+        const batch = writeBatch(db);
+
+        const adminRef = doc(db, `condominios/${ID_CONDOMINIO}/miembros`, "veriuschkamicanal@gmail.com");
+        batch.set(adminRef, {
+          nombre: "Veriuschka (Admin)",
+          email: "veriuschkamicanal@gmail.com",
+          rol: "administrador",
+          apartamento: "Oficina Admin",
+          activo: true
+        });
+
+        const superAdminRef = doc(db, `condominios/${ID_CONDOMINIO}/miembros`, "soyjesusu@gmail.com");
+        batch.set(superAdminRef, {
+          nombre: "Jesús Fernández (SuperAdmin)",
+          email: "soyjesusu@gmail.com",
+          rol: "superadmin",
+          apartamento: "Sistemas",
+          activo: true
+        });
+
+        // 3. Crear 30 apartamentos (Pisos 1 al 10, letras A, B, C)
+        let contadorAptos = 0;
+        for (let piso = 1; piso <= 10; piso++) {
+          ["A", "B", "C"].forEach(letra => {
+            contadorAptos++;
+            const numApto = `Apt ${piso}${letra}`;
+            const emailSimulado = `vecino.${piso}${letra.toLowerCase()}@terraza12.com`;
+
+            const aptoRef = doc(db, `condominios/${ID_CONDOMINIO}/miembros`, emailSimulado);
+            batch.set(aptoRef, {
+              nombre: `Propietario ${numApto}`,
+              email: emailSimulado,
+              apartamento: numApto,
+              rol: "propietario",
+              alicuota: 3.33,
+              saldoPendiente: 0,
+              estadoCuenta: "al_dia",
+              activo: true,
+              fechaRegistro: new Date()
+            });
+          });
+        }
+
+        await batch.commit();
+        log(` Se crearon con éxito los ${contadorAptos} apartamentos.`);
+        log(" ¡Proceso completado con éxito!");
+
+      } catch (error) {
+        log(` Error: ${error.message}`);
+        btnInicializar.disabled = false;
+        btnInicializar.classList.remove('opacity-50');
+      }
+    });
+  </script>
+</body>
+</html>
