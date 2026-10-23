@@ -1,354 +1,374 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Urbana - Administración de Condominios</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Urbana - Terraza 12</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase App y Firestore (v10 compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col font-sans">
 
-  <header class="border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold text-xl">U</div>
-        <div>
-          <h1 class="font-bold text-lg leading-none">Urbana</h1>
-          <p class="text-xs text-slate-400 mt-1">Terraza 12</p>
-        </div>
-      </div>
-      <div id="userSection" class="hidden flex items-center space-x-4">
-        <span id="userEmail" class="text-xs text-slate-300 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700"></span>
-        <span id="roleBadge" class="text-[10px] px-2 py-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-400"></span>
-        <button id="logoutBtn" class="text-xs text-rose-400 hover:text-rose-300 font-medium">Cerrar sesión</button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Login -->
-  <main id="loginView" class="max-w-md mx-auto px-4 py-20">
-    <div class="bg-slate-800/50 border border-slate-700/50 p-8 rounded-2xl shadow-xl text-center">
-      <h2 class="text-2xl font-bold text-white mb-2">Bienvenido a Urbana</h2>
-      <p class="text-sm text-slate-400 mb-8">Inicia sesión con el Gmail registrado en Terraza 12.</p>
-      <button id="googleLoginBtn" class="w-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center space-x-2">
-        <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.24 10.285V13.4h6.887c-.58 2.719-2.855 4.714-6.887 4.714-4.14 0-7.5-3.36-7.5-7.5s3.36-7.5 7.5-7.5c1.88 0 3.597.69 4.92 1.83l2.42-2.42C17.65 1.03 15.11 0 12.24 0 5.64 0 0 5.64 0 12.24s5.64 12.24 12.24 12.24c6.91 0 11.52-4.86 11.52-11.72 0-.79-.08-1.55-.21-2.28H12.24z"/></svg>
-        <span>Iniciar sesión con Google</span>
-      </button>
-      <p id="loginError" class="text-xs text-rose-400 mt-4 hidden"></p>
-    </div>
-  </main>
-
-  <!-- Sin acceso -->
-  <main id="deniedView" class="hidden max-w-md mx-auto px-4 py-20 text-center">
-    <div class="bg-slate-800/50 border border-slate-700/50 p-8 rounded-2xl">
-      <h2 class="text-xl font-bold text-white mb-2">Tu cuenta no tiene acceso</h2>
-      <p class="text-sm text-slate-400">Este correo no está registrado en Terraza 12. Pide al administrador que lo agregue al apartamento que te corresponde y vuelve a entrar.</p>
-    </div>
-  </main>
-
-  <!-- Vista propietario -->
-  <main id="ownerView" class="hidden max-w-2xl mx-auto px-4 py-8">
-    <h3 class="text-xl font-bold text-white mb-4">Mi apartamento</h3>
-    <div id="ownerList" class="grid gap-3"></div>
-  </main>
-
-  <!-- Vista administrador -->
-  <main id="dashboardView" class="hidden max-w-7xl mx-auto px-4 py-8">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
-        <p class="text-xs text-slate-400">Total apartamentos</p>
-        <p id="statTotal" class="text-2xl font-bold text-white mt-1">0</p>
-      </div>
-      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
-        <p class="text-xs text-slate-400">Al día</p>
-        <p id="statAlDia" class="text-2xl font-bold text-emerald-400 mt-1">0</p>
-      </div>
-      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
-        <p class="text-xs text-slate-400">Con deuda</p>
-        <p id="statDeuda" class="text-2xl font-bold text-rose-400 mt-1">0</p>
-      </div>
-      <div class="bg-slate-800/40 border border-slate-700/50 p-4 rounded-xl">
-        <p class="text-xs text-slate-400">Vacíos</p>
-        <p id="statVacio" class="text-2xl font-bold text-amber-400 mt-1">0</p>
-      </div>
-    </div>
-
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-      <h3 class="text-xl font-bold text-white">Apartamentos de Terraza 12</h3>
-      <div class="flex items-center space-x-2">
-        <button onclick="filterApartments('todos')" class="px-3 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300">Todos</button>
-        <button onclick="filterApartments('al_dia')" class="px-3 py-1.5 text-xs font-medium bg-emerald-950/40 border border-emerald-800/50 hover:bg-emerald-900/50 rounded-lg text-emerald-400">Al día</button>
-        <button onclick="filterApartments('con_deuda')" class="px-3 py-1.5 text-xs font-medium bg-rose-950/40 border border-rose-800/50 hover:bg-rose-900/50 rounded-lg text-rose-400">Con deuda</button>
-      </div>
-    </div>
-
-    <div id="apartmentsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-3">
-      <div class="col-span-full text-center py-12 text-slate-500">Cargando datos...</div>
-    </div>
-  </main>
-
-  <!-- Modal editar -->
-  <div id="editModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-      <h4 class="text-lg font-bold text-white mb-4">Editar Apt. <span id="modalAptId"></span></h4>
-      <form id="editForm" class="space-y-4">
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Nombre del propietario</label>
-          <input type="text" id="inputPropietario" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
-        </div>
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Teléfono</label>
-          <input type="text" id="inputTelefono" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
-        </div>
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Gmail del propietario (le da acceso a la app)</label>
-          <input type="email" id="inputCorreo" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
-        </div>
-        <div>
-          <label class="block text-xs text-slate-400 mb-1">Estado de pago</label>
-          <select id="selectEstado" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
-            <option value="al_dia">Al día</option>
-            <option value="con_deuda">Con deuda</option>
-            <option value="vacio">Vacío / desocupado</option>
-          </select>
-        </div>
-        <div class="flex justify-end space-x-3 pt-4">
-          <button type="button" onclick="closeModal()" class="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white">Cancelar</button>
-          <button id="saveBtn" type="submit" class="px-4 py-2 text-xs bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-lg">Guardar cambios</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCUsuks448K-yPSffZdDOSYn7udIrEQKDU",
-      authDomain: "urbana-7e2dd.firebaseapp.com",
-      projectId: "urbana-7e2dd",
-      storageBucket: "urbana-7e2dd.firebasestorage.app",
-      messagingSenderId: "330922344810",
-      appId: "1:330922344810:web:b613ed65bdab395aa46513"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-
-    // Debe coincidir con esProgramador() de las reglas de Firestore
-    const SUPER_ADMIN = 'soyjesusu@gmail.com';
-    const ROLES_ADMIN = ['admin', 'superadmin'];
-
-    const $ = id => document.getElementById(id);
-    const condo = () => db.collection('condominios').doc('terraza12');
-    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
-      c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-    let currentApartments = [];
-    let activeFilter = 'todos';
-    let selectedAptDocId = null;
-    let unsubscribe = null;
-
-    const VIEWS = { login: 'loginView', denied: 'deniedView', owner: 'ownerView', admin: 'dashboardView' };
-    function showView(name) {
-      Object.entries(VIEWS).forEach(([k, id]) => $(id).classList.toggle('hidden', k !== name));
-      $('userSection').classList.toggle('hidden', name === 'login');
-      $('roleBadge').innerText = name === 'admin' ? 'Administrador' : name === 'owner' ? 'Propietario' : '';
-      $('roleBadge').classList.toggle('hidden', name !== 'admin' && name !== 'owner');
-    }
-
-    // Sesión y rol
-    auth.onAuthStateChanged(async user => {
-      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
-      if (!user) { showView('login'); return; }
-      const email = user.email.toLowerCase();
-      $('userEmail').innerText = user.email;
-      try {
-        const snap = await condo().collection('miembros').doc(email).get();
-        const m = snap.exists ? snap.data() : null;
-        if (email === SUPER_ADMIN || (m && ROLES_ADMIN.includes(m.rol))) {
-          showView('admin');
-          loadApartments();
-        } else if (m && m.rol === 'propietario' && m.activo !== false) {
-          showView('owner');
-          loadOwnerApartment(email);
-        } else {
-          showView('denied');
-        }
-      } catch (err) {
-        console.error('Error al verificar acceso:', err);
-        showView('denied');
-      }
-    });
-
-    $('googleLoginBtn').addEventListener('click', () => {
-      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(error => {
-        $('loginError').innerText = error.message;
-        $('loginError').classList.remove('hidden');
-      });
-    });
-    $('logoutBtn').addEventListener('click', () => auth.signOut());
-
-    const BADGES = {
-      al_dia:    { cls: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400', text: 'Al día' },
-      con_deuda: { cls: 'bg-rose-500/10 border-rose-500/30 text-rose-400', text: 'Deuda' },
-      vacio:     { cls: 'bg-amber-500/10 border-amber-500/30 text-amber-400', text: 'Vacío' }
-    };
-    const badge = estado => BADGES[estado] || BADGES.al_dia;
-    const byId = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true });
-
-    // Propietario: solo consulta su apartamento (exigido por las reglas)
-    function loadOwnerApartment(email) {
-      unsubscribe = condo().collection('apartamentos').where('correo', '==', email)
-        .onSnapshot(snapshot => {
-          const apts = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort(byId);
-          $('ownerList').innerHTML = apts.length ? apts.map(apt => {
-            const b = badge(apt.estado);
-            return `<div class="bg-slate-800/60 border border-slate-700/60 p-5 rounded-xl">
-              <div class="flex justify-between items-start mb-3">
-                <span class="font-bold text-xl text-white">Apt ${esc(apt.numero || apt.id)}</span>
-                <span class="text-xs px-2 py-0.5 rounded-full border ${b.cls}">${b.text}</span>
-              </div>
-              <p class="text-sm text-slate-300">${esc(apt.propietario || 'Sin nombre')}</p>
-              <p class="text-xs text-slate-500 mt-1">${esc(apt.telefono || 'Sin teléfono')}</p>
-            </div>`;
-          }).join('') : '<p class="text-sm text-slate-400">Tu correo aún no está asignado a un apartamento. Avisa al administrador.</p>';
-        }, error => {
-          console.error(error);
-          $('ownerList').innerHTML = '<p class="text-sm text-rose-400">No se pudo cargar tu apartamento.</p>';
-        });
-    }
-
-    // Administrador: todos los apartamentos
-    function loadApartments() {
-      unsubscribe = condo().collection('apartamentos').onSnapshot(snapshot => {
-        currentApartments = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort(byId);
-        renderDashboard();
-      }, error => {
-        console.error('Error al cargar apartamentos:', error);
-        $('apartmentsGrid').innerHTML = '<div class="col-span-full text-center py-12 text-rose-400">No tienes permiso para ver este condominio.</div>';
-      });
-    }
-
-    function renderDashboard() {
-      const grid = $('apartmentsGrid');
-      grid.innerHTML = '';
-      $('statTotal').innerText = currentApartments.length;
-
-      if (currentApartments.length === 0) {
-        grid.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400">Todavía no hay apartamentos registrados.<br><button onclick="crearApartamentos()" class="mt-4 px-4 py-2 text-xs font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 rounded-lg">Crear apartamentos 1 al 30</button></div>';
-        return;
-      }
-
-      let alDia = 0, deuda = 0, vacio = 0;
-      currentApartments.forEach(a => {
-        if (a.estado === 'al_dia') alDia++;
-        else if (a.estado === 'con_deuda') deuda++;
-        else if (a.estado === 'vacio') vacio++;
-      });
-      $('statAlDia').innerText = alDia;
-      $('statDeuda').innerText = deuda;
-      $('statVacio').innerText = vacio;
-
-      currentApartments
-        .filter(apt => activeFilter === 'todos' || apt.estado === activeFilter)
-        .forEach(apt => {
-          const b = badge(apt.estado);
-          const card = document.createElement('div');
-          card.className = 'bg-slate-800/60 border border-slate-700/60 hover:border-sky-500/50 p-4 rounded-xl cursor-pointer transition duration-150 flex flex-col justify-between';
-          card.onclick = () => openEditModal(apt);
-          card.innerHTML = `
+    <!-- BARRA SUPERIOR (HEADER) -->
+    <header class="bg-gray-900 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="bg-blue-600 rounded-lg w-10 h-10 flex items-center justify-center font-bold text-lg text-white">U</div>
             <div>
-              <div class="flex justify-between items-start mb-2">
-                <span class="font-bold text-lg text-white">Apt ${esc(apt.numero || apt.id)}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full border ${b.cls}">${b.text}</span>
-              </div>
-              <p class="text-xs text-slate-300 font-medium truncate">${esc(apt.propietario || 'Sin asignar')}</p>
+                <h1 class="font-bold text-lg text-white leading-tight">Urbana</h1>
+                <p class="text-xs text-gray-400">Terraza 12</p>
             </div>
-            <p class="text-[11px] text-slate-500 mt-3 truncate">${esc(apt.telefono || 'Sin teléfono')}</p>`;
-          grid.appendChild(card);
+        </div>
+
+        <div id="user-session-info" class="flex items-center space-x-4 hidden">
+            <span id="user-email" class="bg-gray-800 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-full"></span>
+            <span id="user-role-badge" class="bg-blue-900/60 text-blue-300 border border-blue-700 text-xs px-2.5 py-1 rounded-full font-medium"></span>
+            <button onclick="cerrarSesion()" class="text-xs text-red-400 hover:text-red-300 font-medium transition-colors">Cerrar Sesión</button>
+        </div>
+    </header>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <div id="app-container" class="flex-1 flex">
+
+        <!-- ========================================== -->
+        <!-- 1. VISTA ADMINISTRADOR                     -->
+        <!-- ========================================== -->
+        <section id="vista-admin" class="flex-1 p-8 hidden">
+            <!-- Métricas -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-gray-900 border border-gray-800 p-5 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium mb-1">Total Apartamentos</p>
+                    <p class="text-3xl font-bold text-white" id="stat-total">30</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-5 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium mb-1">Al Día</p>
+                    <p class="text-3xl font-bold text-emerald-400" id="stat-aldia">0</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-5 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium mb-1">Con Deuda</p>
+                    <p class="text-3xl font-bold text-rose-500" id="stat-deuda">0</p>
+                </div>
+                <div class="bg-gray-900 border border-gray-800 p-5 rounded-xl">
+                    <p class="text-xs text-gray-400 font-medium mb-1">Vacíos</p>
+                    <p class="text-3xl font-bold text-amber-400" id="stat-vacios">0</p>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-white">Apartamentos de Terraza 12</h2>
+                <div class="flex space-x-2">
+                    <button onclick="filtrarApartamentos('todos')" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-300 border border-gray-700">Todos</button>
+                    <button onclick="filtrarApartamentos('al_dia')" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-950/40 text-emerald-400 border border-emerald-800">Al Día</button>
+                    <button onclick="filtrarApartamentos('con_deuda')" class="px-3 py-1.5 rounded-lg text-xs bg-rose-950/40 text-rose-400 border border-rose-800">Con Deuda</button>
+                </div>
+            </div>
+
+            <!-- Grilla de Apartamentos -->
+            <div id="grid-apartamentos" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Se poblará dinámicamente desde Firestore -->
+            </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- 2. VISTA MIEMBRO / PROPIETARIO (SIDEBAR)  -->
+        <!-- ========================================== -->
+        <section id="vista-miembro" class="flex-1 flex hidden">
+            <!-- Sidebar Izquierdo -->
+            <aside class="w-64 bg-gray-900 border-r border-gray-800 p-4 flex flex-col justify-between">
+                <div class="space-y-2">
+                    <p class="text-xs font-semibold text-gray-500 uppercase px-3 py-2">Menú Propietario</p>
+                    <nav class="space-y-1">
+                        <button onclick="cambiarTabMiembro('inmueble')" id="tab-btn-inmueble" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white transition-colors">
+                            <span>🏠</span><span>Mi Inmueble</span>
+                        </button>
+                        <button onclick="cambiarTabMiembro('recibos')" id="tab-btn-recibos" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+                            <span>📄</span><span>Recibos de Condominio</span>
+                        </button>
+                        <button onclick="cambiarTabMiembro('reportar')" id="tab-btn-reportar" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+                            <span>💳</span><span>Reportar Pago</span>
+                        </button>
+                        <button onclick="cambiarTabMiembro('historial')" id="tab-btn-historial" class="w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors">
+                            <span>📜</span><span>Historial de Pagos</span>
+                        </button>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- Área de Contenido de Miembro -->
+            <main class="flex-1 p-8 overflow-y-auto">
+                <!-- Tab: Mi Inmueble -->
+                <div id="tab-inmueble" class="tab-miembro-content">
+                    <h2 class="text-2xl font-bold mb-6">Mi apartamento</h2>
+                    <div id="mi-apartamento-card" class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-md">
+                        <!-- Carga dinámica del apartamento asignado -->
+                    </div>
+                </div>
+
+                <!-- Tab: Recibos -->
+                <div id="tab-recibos" class="tab-miembro-content hidden">
+                    <h2 class="text-2xl font-bold mb-6">Recibos de Condominio</h2>
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                        <p class="text-gray-400 text-sm mb-4">Avisos de cobro cargados para este inmueble.</p>
+                        <div id="lista-recibos" class="space-y-3">
+                            <p class="text-sm text-gray-500">No hay recibos registrados por el momento.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Reportar Pago -->
+                <div id="tab-reportar" class="tab-miembro-content hidden">
+                    <h2 class="text-2xl font-bold mb-6">Reportar un Pago</h2>
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 max-w-lg">
+                        <form onsubmit="guardarPagoReportado(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Número de Referencia / Pago Móvil</label>
+                                <input type="text" id="pago-ref" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500" placeholder="Ej: 00123456">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Monto Pagado ($ / Bs)</label>
+                                <input type="number" step="0.01" id="pago-monto" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Fecha del Pago</label>
+                                <input type="date" id="pago-fecha" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500">
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 px-4 rounded-lg text-sm transition-colors">
+                                Registrar Reporte
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Tab: Historial -->
+                <div id="tab-historial" class="tab-miembro-content hidden">
+                    <h2 class="text-2xl font-bold mb-6">Historial de Pagos Reportados</h2>
+                    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                        <div id="lista-historial" class="space-y-3">
+                            <p class="text-sm text-gray-500">No se han registrado reportes aún.</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </section>
+
+    </div>
+
+    <!-- LÓGICA JAVASCRIPT -->
+    <script>
+        // CONFIGURACIÓN FIREBASE (Reemplaza con tus credenciales reales si difieren)
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "TU_PROJECT.firebaseapp.com",
+            projectId: "TU_PROJECT_ID",
+            storageBucket: "TU_PROJECT.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID"
+        };
+
+        // Inicializar Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // Estado Global
+        let usuarioActual = null;
+        let aptoAsignadoNum = null;
+
+        // Detección de Sesión
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                usuarioActual = user;
+                document.getElementById('user-session-info').classList.remove('hidden');
+                document.getElementById('user-email').innerText = user.email;
+                determinarRolYRenderizar(user.email);
+            } else {
+                // Redirigir a login si aplica
+                console.log("No hay usuario autenticado.");
+            }
         });
-    }
 
-    function crearApartamentos() {
-      if (!confirm('Se crearán los apartamentos 1 al 30 de Terraza 12, todos vacíos. ¿Continuar?')) return;
-      const batch = db.batch();
-      for (let n = 1; n <= 30; n++) {
-        batch.set(condo().collection('apartamentos').doc(String(n)),
-          { numero: String(n), propietario: '', telefono: '', correo: '', estado: 'vacio' });
-      }
-      batch.commit().catch(err => alert('Error al crear los apartamentos: ' + err.message));
-    }
+        // Determinar Rol
+        function determinarRolYRenderizar(email) {
+            // Ejemplo: si es el admin principal
+            if (email === 'admin@terraza12.com' || email === 'soyjesusu@gmail.com') {
+                document.getElementById('user-role-badge').innerText = 'Administrador';
+                document.getElementById('vista-admin').classList.remove('hidden');
+                cargarDashboardAdmin();
+            } else {
+                // Es propietario / miembro
+                document.getElementById('user-role-badge').innerText = 'Propietario';
+                document.getElementById('vista-miembro').classList.remove('hidden');
+                cargarDatosMiembro(email);
+            }
+        }
 
-    function filterApartments(filter) { activeFilter = filter; renderDashboard(); }
+        // --- LÓGICA DE MIEMBRO / PROPIETARIO ---
+        function cargarDatosMiembro(email) {
+            // Buscar apartamento asignado al correo
+            db.collection('condominios').doc('terraza12').collection('apartamentos')
+                .where('correo', '==', email)
+                .get()
+                .then(snapshot => {
+                    if (!snapshot.empty) {
+                        const doc = snapshot.docs[0];
+                        aptoAsignadoNum = doc.id;
+                        const data = doc.data();
 
-    function openEditModal(apt) {
-      selectedAptDocId = apt.id;
-      $('modalAptId').innerText = apt.numero || apt.id;
-      $('inputPropietario').value = apt.propietario || '';
-      $('inputTelefono').value = apt.telefono || '';
-      $('inputCorreo').value = apt.correo || '';
-      $('selectEstado').value = apt.estado || 'al_dia';
-      $('editModal').classList.remove('hidden');
-      $('editModal').classList.add('flex');
-    }
-    function closeModal() {
-      $('editModal').classList.add('hidden');
-      $('editModal').classList.remove('flex');
-    }
+                        document.getElementById('mi-apartamento-card').innerHTML = `
+                            <div class="flex justify-between items-start mb-4">
+                                <h3 class="text-xl font-bold">Apt ${data.numero || aptoAsignadoNum}</h3>
+                                <span class="bg-emerald-900/50 text-emerald-400 border border-emerald-700 px-3 py-1 rounded-full text-xs font-semibold">
+                                    ${data.estado === 'al_dia' ? 'Al día' : 'Con deuda'}
+                                </span>
+                            </div>
+                            <p class="text-gray-300 font-medium">${data.propietario || 'Sin nombre'}</p>
+                            <p class="text-gray-400 text-sm mt-1">${data.telefono || 'Sin teléfono'}</p>
+                        `;
 
-    // Guardar: actualiza el apartamento y sincroniza el acceso en miembros/{correo}
-    $('editForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      if (!selectedAptDocId) return;
-      const id = selectedAptDocId;
-      const apt = currentApartments.find(a => a.id === id) || {};
-      const propietario = $('inputPropietario').value.trim();
-      const telefono = $('inputTelefono').value.trim();
-      const correo = $('inputCorreo').value.trim().toLowerCase();
-      const estado = $('selectEstado').value;
-      const oldCorreo = (apt.correo || '').toLowerCase();
-      const miembros = condo().collection('miembros');
+                        // Cargar subcolecciones
+                        cargarRecibosMiembro();
+                        cargarHistorialMiembro();
+                    } else {
+                        document.getElementById('mi-apartamento-card').innerHTML = `
+                            <p class="text-sm text-gray-400">No se encontró un apartamento asignado a ${email}.</p>
+                        `;
+                    }
+                });
+        }
 
-      $('saveBtn').disabled = true;
-      try {
-        const batch = db.batch();
-        batch.update(condo().collection('apartamentos').doc(id), { propietario, telefono, correo, estado });
-
-        if (correo && correo !== SUPER_ADMIN) {
-          const snap = await miembros.doc(correo).get();
-          const m = snap.exists ? snap.data() : null;
-          if (!m) {
-            batch.set(miembros.doc(correo), {
-              email: correo, nombre: propietario || 'Propietario Apt ' + id, rol: 'propietario',
-              apartamento: id, activo: true,
-              fechaRegistro: firebase.firestore.FieldValue.serverTimestamp()
+        function cambiarTabMiembro(tab) {
+            document.querySelectorAll('.tab-miembro-content').forEach(el => el.classList.add('hidden'));
+            ['inmueble', 'recibos', 'reportar', 'historial'].forEach(t => {
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (btn) btn.className = "w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white transition-colors";
             });
-          } else if (!ROLES_ADMIN.includes(m.rol)) {
-            // No se toca a un admin que sea dueño de un apartamento
-            batch.set(miembros.doc(correo), {
-              nombre: propietario || m.nombre || 'Propietario Apt ' + id, apartamento: id, activo: true
-            }, { merge: true });
-          }
+
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            if (activeBtn) activeBtn.className = "w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-600 text-white transition-colors";
         }
 
-        // Si cambió el correo, retira el acceso del propietario anterior
-        if (oldCorreo && oldCorreo !== correo && oldCorreo !== SUPER_ADMIN) {
-          const old = await miembros.doc(oldCorreo).get();
-          if (old.exists && old.data().rol === 'propietario' && old.data().apartamento === id) {
-            batch.delete(miembros.doc(oldCorreo));
-          }
+        // Guardar Reporte en subcolección 'pagos_reportados'
+        function guardarPagoReportado(e) {
+            e.preventDefault();
+            if (!aptoAsignadoNum) return alert("No tienes un apartamento asociado.");
+
+            const ref = document.getElementById('pago-ref').value;
+            const monto = parseFloat(document.getElementById('pago-monto').value);
+            const fecha = document.getElementById('pago-fecha').value;
+
+            db.collection('condominios').doc('terraza12')
+              .collection('apartamentos').doc(aptoAsignadoNum)
+              .collection('pagos_reportados').add({
+                  referencia: ref,
+                  monto: monto,
+                  fecha: fecha,
+                  estatus: 'por_verificar',
+                  creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+              })
+              .then(() => {
+                  alert('¡Pago reportado con éxito!');
+                  e.target.reset();
+                  cambiarTabMiembro('historial');
+                  cargarHistorialMiembro();
+              })
+              .catch(err => alert('Error al guardar: ' + err.message));
         }
 
-        await batch.commit();
-        closeModal();
-      } catch (err) {
-        alert('Error al guardar cambios: ' + err.message);
-      } finally {
-        $('saveBtn').disabled = false;
-      }
-    });
-  </script>
+        function cargarHistorialMiembro() {
+            if (!aptoAsignadoNum) return;
+            db.collection('condominios').doc('terraza12')
+              .collection('apartamentos').doc(aptoAsignadoNum)
+              .collection('pagos_reportados')
+              .orderBy('creadoEn', 'desc')
+              .get()
+              .then(snapshot => {
+                  const cont = document.getElementById('lista-historial');
+                  if (snapshot.empty) {
+                      cont.innerHTML = '<p class="text-sm text-gray-500">No se han registrado reportes aún.</p>';
+                      return;
+                  }
+                  let html = '';
+                  snapshot.forEach(doc => {
+                      const p = doc.data();
+                      html += `
+                        <div class="bg-gray-950 p-4 rounded-lg border border-gray-800 flex justify-between items-center">
+                            <div>
+                                <p class="text-sm font-bold text-white">Ref: ${p.referencia}</p>
+                                <p class="text-xs text-gray-400">Fecha: ${p.fecha}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-semibold text-emerald-400">$${p.monto}</p>
+                                <span class="text-xs bg-amber-950/60 text-amber-400 border border-amber-800 px-2 py-0.5 rounded-full">Por verificar</span>
+                            </div>
+                        </div>
+                      `;
+                  });
+                  cont.innerHTML = html;
+              });
+        }
+
+        function cargarRecibosMiembro() {
+            if (!aptoAsignadoNum) return;
+            db.collection('condominios').doc('terraza12')
+              .collection('apartamentos').doc(aptoAsignadoNum)
+              .collection('recibos')
+              .get()
+              .then(snapshot => {
+                  const cont = document.getElementById('lista-recibos');
+                  if (snapshot.empty) {
+                      cont.innerHTML = '<p class="text-sm text-gray-500">No hay recibos pendientes en este momento.</p>';
+                      return;
+                  }
+                  // Render de recibos si existen
+              });
+        }
+
+        // --- LÓGICA ADMIN (Dashboard) ---
+        function cargarDashboardAdmin() {
+            db.collection('condominios').doc('terraza12').collection('apartamentos')
+              .onSnapshot(snapshot => {
+                  const grid = document.getElementById('grid-apartamentos');
+                  grid.innerHTML = '';
+                  let aldia = 0, deuda = 0, vacios = 0;
+
+                  snapshot.forEach(doc => {
+                      const data = doc.data();
+                      if (data.estado === 'al_dia') aldia++;
+                      else if (data.estado === 'con_deuda') deuda++;
+                      else vacios++;
+
+                      grid.innerHTML += `
+                        <div class="bg-gray-900 border border-gray-800 p-4 rounded-xl">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-sm">Apt ${doc.id}</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full ${
+                                    data.estado === 'al_dia' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                                    data.estado === 'con_deuda' ? 'bg-rose-950 text-rose-400 border border-rose-800' :
+                                    'bg-amber-950 text-amber-400 border border-amber-800'
+                                }">${data.estado || 'vacío'}</span>
+                            </div>
+                            <p class="text-xs text-gray-300 font-medium truncate">${data.propietario || 'Sin asignar'}</p>
+                            <p class="text-[11px] text-gray-500 truncate">${data.telefono || 'Sin teléfono'}</p>
+                        </div>
+                      `;
+                  });
+
+                  document.getElementById('stat-aldia').innerText = aldia;
+                  document.getElementById('stat-deuda').innerText = deuda;
+                  document.getElementById('stat-vacios').innerText = vacios;
+              });
+        }
+
+        function cerrarSesion() {
+            auth.signOut().then(() => location.reload());
+        }
+    </script>
 </body>
 </html>
