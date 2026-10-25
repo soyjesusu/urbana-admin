@@ -59,6 +59,7 @@
   <div class="flex space-x-2 mb-6 border-b border-gray-800">
     <button id="atab-apts" onclick="tabAdmin('apts')" class="px-4 py-2 text-sm font-medium border-b-2 border-blue-500 text-white">Apartamentos</button>
     <button id="atab-pagos" onclick="tabAdmin('pagos')" class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400">Pagos reportados</button>
+    <button id="atab-fin" onclick="tabAdmin('fin')" class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400">Finanzas</button>
   </div>
 
   <div id="admin-apts">
@@ -77,6 +78,33 @@
   <div id="admin-pagos" class="hidden">
     <h2 class="text-xl font-bold mb-4">Pagos por verificar</h2>
     <div id="lista-pagos-admin" class="space-y-3"></div>
+  </div>
+
+  <div id="admin-fin" class="hidden">
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+      <h2 class="text-xl font-bold">Ingresos y gastos</h2>
+      <div class="flex items-center gap-2"><label class="text-xs text-gray-400">Mes</label>
+        <input type="month" id="fin-mes" onchange="renderFinanzas()" class="bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs"></div>
+    </div>
+    <div id="fin-resumen" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+    <form onsubmit="guardarMovimiento(event)" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
+      <div><label class="block text-xs text-gray-400 mb-1">Tipo</label>
+        <select id="mov-tipo" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
+      <div><label class="block text-xs text-gray-400 mb-1">Fecha</label>
+        <input type="date" id="mov-fecha" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"></div>
+      <div class="col-span-2"><label class="block text-xs text-gray-400 mb-1">Concepto</label>
+        <input type="text" id="mov-concepto" required placeholder="Ej: Pago de vigilancia" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="block text-xs text-gray-400 mb-1">Categoría</label>
+        <select id="mov-cat" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+          <option>Vigilancia</option><option>Limpieza</option><option>Electricidad y agua</option><option>Mantenimiento</option>
+          <option>Ascensor</option><option>Administración</option><option>Cuotas de condominio</option><option>Fondo de reserva</option><option>Otros</option></select></div>
+      <div class="flex gap-2"><div class="flex-1"><label class="block text-xs text-gray-400 mb-1">Monto</label>
+        <input type="number" step="0.01" min="0" id="mov-monto" required class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"></div>
+        <div><label class="block text-xs text-gray-400 mb-1">&nbsp;</label>
+        <select id="mov-moneda" class="bg-gray-950 border border-gray-800 rounded-lg px-2 py-2 text-sm"><option value="USD">$</option><option value="Bs">Bs</option></select></div></div>
+      <button type="submit" class="col-span-2 md:col-span-6 bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg text-sm">Registrar movimiento</button>
+    </form>
+    <div id="fin-lista" class="space-y-2"></div>
   </div>
 </section>
 
@@ -189,7 +217,7 @@ function recuperarClave() {
   auth.sendPasswordResetEmail(email).then(() => alert('Te enviamos un correo para restablecer la contraseña.')).catch(e => alert(e.message));
 }
 function cerrarSesion() {
-  if (unsubApts) unsubApts(); unsubPagos.forEach(u => u()); unsubPagos = [];
+  if (unsubApts) unsubApts(); if (unsubFin) unsubFin(); unsubPagos.forEach(u => u()); unsubPagos = [];
   auth.signOut();
 }
 
@@ -258,12 +286,14 @@ function cargarHistorialMiembro() {
 
 // ---------- ADMIN ----------
 function tabAdmin(t) {
-  show('admin-apts', t === 'apts'); show('admin-pagos', t === 'pagos');
-  $('atab-apts').className = 'px-4 py-2 text-sm font-medium border-b-2 ' + (t === 'apts' ? 'border-blue-500 text-white' : 'border-transparent text-gray-400');
-  $('atab-pagos').className = 'px-4 py-2 text-sm font-medium border-b-2 ' + (t === 'pagos' ? 'border-blue-500 text-white' : 'border-transparent text-gray-400');
+  [['apts','admin-apts'],['pagos','admin-pagos'],['fin','admin-fin']].forEach(([k, id]) => {
+    show(id, t === k);
+    $('atab-' + k).className = 'px-4 py-2 text-sm font-medium border-b-2 ' + (t === k ? 'border-blue-500 text-white' : 'border-transparent text-gray-400');
+  });
 }
 
 function cargarDashboardAdmin() {
+  cargarFinanzas();
   if (unsubApts) unsubApts();
   unsubApts = base().collection('apartamentos').onSnapshot(snap => {
     cacheApts = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
@@ -315,8 +345,61 @@ function resolverPago(apto, pid, estatus) {
   const ref = base().collection('apartamentos').doc(apto);
   const batch = db.batch();
   batch.update(ref.collection('pagos_reportados').doc(pid), { estatus, resueltoEn: firebase.firestore.FieldValue.serverTimestamp() });
-  if (estatus === 'verificado') batch.update(ref, { estado: 'al_dia' });
+  if (estatus === 'verificado') {
+    batch.update(ref, { estado: 'al_dia' });
+    const p = (pagosPorApto[apto] || []).find(x => x.pid === pid);
+    if (p) batch.set(base().collection('movimientos').doc('pago_' + pid), {
+      tipo: 'ingreso', fecha: p.fecha, concepto: `Pago condominio Apt ${apto} (Ref ${p.referencia})`, categoria: 'Cuotas de condominio',
+      monto: p.monto, moneda: p.moneda || 'USD', apto, origen: 'pago', creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
   batch.commit().catch(e => alert('Error: ' + e.message));
+}
+
+// ---------- FINANZAS ----------
+let movimientos = [], unsubFin = null;
+const hoy = () => new Date().toISOString().slice(0, 10);
+function cargarFinanzas() {
+  if ($('mov-fecha') && !$('mov-fecha').value) $('mov-fecha').value = hoy();
+  if (!$('fin-mes').value) $('fin-mes').value = hoy().slice(0, 7);
+  if (unsubFin) unsubFin();
+  unsubFin = base().collection('movimientos').orderBy('fecha', 'desc').onSnapshot(snap => {
+    movimientos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderFinanzas();
+  }, err => alert('Error cargando finanzas: ' + err.message));
+}
+const money = (n, m) => (m === 'Bs' ? 'Bs ' : '$') + n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function renderFinanzas() {
+  const mes = $('fin-mes').value;
+  const lista = movimientos.filter(m => !mes || (m.fecha || '').startsWith(mes));
+  const monedas = ['USD', 'Bs'].filter(c => lista.some(m => (m.moneda || 'USD') === c));
+  if (!monedas.length) monedas.push('USD');
+  $('fin-resumen').innerHTML = monedas.map(c => {
+    const ing = lista.filter(m => (m.moneda || 'USD') === c && m.tipo === 'ingreso').reduce((a, m) => a + Number(m.monto || 0), 0);
+    const gas = lista.filter(m => (m.moneda || 'USD') === c && m.tipo === 'gasto').reduce((a, m) => a + Number(m.monto || 0), 0);
+    return `<div class="bg-gray-900 border border-gray-800 rounded-xl p-5"><p class="text-xs text-gray-400 mb-3">Resumen en ${c === 'Bs' ? 'bolívares' : 'dólares'}</p>
+      <div class="grid grid-cols-3 gap-2 text-sm"><div><p class="text-xs text-gray-500">Ingresos</p><p class="font-bold text-emerald-400">${money(ing, c)}</p></div>
+      <div><p class="text-xs text-gray-500">Gastos</p><p class="font-bold text-rose-400">${money(gas, c)}</p></div>
+      <div><p class="text-xs text-gray-500">Balance</p><p class="font-bold ${ing - gas >= 0 ? 'text-white' : 'text-rose-500'}">${money(ing - gas, c)}</p></div></div></div>`;
+  }).join('');
+  $('fin-lista').innerHTML = lista.length ? lista.map(m => `
+    <div class="bg-gray-900 border border-gray-800 p-3 rounded-lg flex justify-between items-center gap-3">
+      <div class="min-w-0"><p class="text-sm font-medium truncate">${esc(m.concepto)}</p>
+      <p class="text-xs text-gray-500">${esc(m.fecha)} · ${esc(m.categoria)}${m.origen === 'pago' ? ' · automático' : ''}</p></div>
+      <div class="flex items-center gap-3 shrink-0"><p class="text-sm font-semibold ${m.tipo === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'}">${m.tipo === 'ingreso' ? '+' : '−'}${money(Number(m.monto || 0), m.moneda)}</p>
+      <button onclick="eliminarMovimiento('${esc(m.id)}')" class="text-xs text-gray-500 hover:text-rose-400">Eliminar</button></div></div>`).join('')
+    : '<p class="text-sm text-gray-500">No hay movimientos en este mes.</p>';
+}
+function guardarMovimiento(e) {
+  e.preventDefault();
+  base().collection('movimientos').add({
+    tipo: $('mov-tipo').value, fecha: $('mov-fecha').value, concepto: $('mov-concepto').value.trim(), categoria: $('mov-cat').value,
+    monto: parseFloat($('mov-monto').value), moneda: $('mov-moneda').value, origen: 'manual',
+    creadoPor: auth.currentUser.email, creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(() => { $('mov-concepto').value = ''; $('mov-monto').value = ''; })
+    .catch(err => alert('Error al guardar: ' + err.message));
+}
+function eliminarMovimiento(id) {
+  if (confirm('¿Eliminar este movimiento?')) base().collection('movimientos').doc(id).delete().catch(e => alert(e.message));
 }
 </script>
 </body>
