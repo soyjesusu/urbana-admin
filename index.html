@@ -21,6 +21,7 @@
   <div id="user-session-info" class="hidden items-center space-x-4">
     <span id="user-email" class="bg-gray-800 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-full"></span>
     <span id="user-role-badge" class="bg-blue-900/60 text-blue-300 border border-blue-700 text-xs px-2.5 py-1 rounded-full font-medium"></span>
+    <button id="btn-vista" onclick="cambiarVista()" class="hidden text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg font-medium"></button>
     <button id="btn-invitar" onclick="abrirInvitar()" class="hidden text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-medium">Invitar vecino</button>
     <button onclick="cerrarSesion()" class="text-xs text-red-400 hover:text-red-300 font-medium">Cerrar Sesión</button>
   </div>
@@ -265,7 +266,6 @@ const firebaseConfig = {
   messagingSenderId: "330922344810",
   appId: "1:330922344810:web:b613ed65bdab395aa46513"
 };
-const ADMINS = ['admin@terraza12.com', 'soyjesusu@gmail.com']; // solo para la interfaz; la seguridad real va en las reglas de Firestore
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
@@ -279,26 +279,39 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const show = (id, v) => $(id).classList.toggle('hidden', !v);
 
 // ---------- SESIÓN ----------
-auth.onAuthStateChanged(user => {
+let vistaActual = 'miembro';
+const esAdminEmail = email => [condo.superAdminEmail, condo.administradorEmail].filter(Boolean).map(x => String(x).trim().toLowerCase()).includes(email);
+function modoVista(m) {
+  const adm = m === 'admin'; vistaActual = m;
+  show('vista-admin', adm); show('vista-miembro', !adm);
+  $('user-role-badge').textContent = adm ? 'Administrador' : 'Propietario';
+  $('btn-invitar').classList.toggle('hidden', !adm);
+  $('btn-vista').textContent = adm ? 'Ver como propietario' : 'Volver al panel de administrador';
+  if (adm) cargarDashboardAdmin();
+  else { cambiarTabMiembro('inmueble'); cargarDatosMiembro(auth.currentUser.email); cargarFinanzas(); }
+}
+function cambiarVista() { modoVista(vistaActual === 'admin' ? 'miembro' : 'admin'); }
+
+auth.onAuthStateChanged(async user => {
   ['vista-admin','vista-miembro'].forEach(v => show(v, false));
-  $('btn-invitar').classList.add('hidden');
+  $('btn-invitar').classList.add('hidden'); $('btn-vista').classList.add('hidden');
   if (!user) {
     show('vista-login', true);
     $('user-session-info').classList.add('hidden'); $('user-session-info').classList.remove('flex');
     return;
   }
   show('vista-login', false);
-  base().get().then(d => { condo = d.data() || {}; if ($('rec-mes') && !$('rec-mes').value) $('rec-mes').value = hoy().slice(0, 7); });
   $('user-session-info').classList.remove('hidden'); $('user-session-info').classList.add('flex');
   $('user-email').textContent = user.email;
+  try { condo = (await base().get()).data() || {}; } catch (e) { condo = {}; }
+  if ($('rec-mes') && !$('rec-mes').value) $('rec-mes').value = hoy().slice(0, 7);
   const email = (user.email || '').toLowerCase();
-  if (ADMINS.includes(email)) {
-    $('user-role-badge').textContent = 'Administrador'; $('btn-invitar').classList.remove('hidden');
-    show('vista-admin', true); cargarDashboardAdmin();
-  } else {
-    $('user-role-badge').textContent = 'Propietario';
-    show('vista-miembro', true); cambiarTabMiembro('inmueble'); cargarDatosMiembro(user.email); cargarFinanzas();
-  }
+  if (esAdminEmail(email)) {
+    modoVista('admin');
+    // si el administrador también es propietario, puede alternar entre las dos vistas
+    base().collection('apartamentos').where('correo', '==', email).get()
+      .then(sn => { if (!sn.empty) $('btn-vista').classList.remove('hidden'); }).catch(() => {});
+  } else modoVista('miembro');
 });
 
 function iniciarSesion(e) {
