@@ -87,6 +87,13 @@
         <input type="month" id="fin-mes" onchange="renderFinanzas()" class="bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs"></div>
     </div>
     <div id="fin-resumen" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+    <div class="flex flex-wrap gap-2 mb-3">
+      <button onclick="exportarCSV()" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700">⬇ Exportar Excel (CSV)</button>
+      <button onclick="imprimirFinanzas()" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700">🖨 Imprimir / PDF</button>
+      <button onclick="compartirWhatsApp()" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-700 hover:bg-emerald-600 text-white">WhatsApp: elegir chat o grupo</button>
+      <button onclick="toggleWaPanel()" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-700 hover:bg-emerald-600 text-white">WhatsApp: a cada apartamento</button>
+    </div>
+    <div id="wa-panel" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6 grid grid-cols-1 md:grid-cols-2 gap-2"></div>
     <form onsubmit="guardarMovimiento(event)" class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-6 grid grid-cols-2 md:grid-cols-6 gap-3 items-end">
       <div><label class="block text-xs text-gray-400 mb-1">Tipo</label>
         <select id="mov-tipo" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"><option value="gasto">Gasto</option><option value="ingreso">Ingreso</option></select></div>
@@ -116,6 +123,7 @@
       <button onclick="cambiarTabMiembro('inmueble')" id="tab-btn-inmueble" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium">🏠 Mi Inmueble</button>
       <button onclick="cambiarTabMiembro('recibos')" id="tab-btn-recibos" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium">📄 Recibos</button>
       <button onclick="cambiarTabMiembro('reportar')" id="tab-btn-reportar" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium">💳 Reportar Pago</button>
+      <button onclick="cambiarTabMiembro('transparencia')" id="tab-btn-transparencia" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium">📊 Gastos del Condominio</button>
       <button onclick="cambiarTabMiembro('historial')" id="tab-btn-historial" class="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium">📜 Historial</button>
     </nav>
   </aside>
@@ -145,6 +153,14 @@
           <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg text-sm">Registrar Reporte</button>
         </form>
       </div>
+    </div>
+    <div id="tab-transparencia" class="tab-miembro-content hidden">
+      <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <h2 class="text-2xl font-bold">Gastos e ingresos del condominio</h2>
+        <input type="month" id="tr-mes" onchange="renderTransp()" class="bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs">
+      </div>
+      <div id="tr-resumen" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+      <div id="tr-lista" class="space-y-2"></div>
     </div>
     <div id="tab-historial" class="tab-miembro-content hidden">
       <h2 class="text-2xl font-bold mb-6">Historial de Pagos Reportados</h2>
@@ -194,7 +210,7 @@ auth.onAuthStateChanged(user => {
     show('vista-admin', true); cargarDashboardAdmin();
   } else {
     $('user-role-badge').textContent = 'Propietario';
-    show('vista-miembro', true); cambiarTabMiembro('inmueble'); cargarDatosMiembro(user.email);
+    show('vista-miembro', true); cambiarTabMiembro('inmueble'); cargarDatosMiembro(user.email); cargarFinanzas();
   }
 });
 
@@ -226,7 +242,7 @@ const tabOn = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium bg-bl
 const tabOff = "w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-white";
 function cambiarTabMiembro(tab) {
   document.querySelectorAll('.tab-miembro-content').forEach(el => el.classList.add('hidden'));
-  ['inmueble','recibos','reportar','historial'].forEach(t => $('tab-btn-' + t).className = t === tab ? tabOn : tabOff);
+  ['inmueble','recibos','reportar','transparencia','historial'].forEach(t => $('tab-btn-' + t).className = t === tab ? tabOn : tabOff);
   $('tab-' + tab).classList.remove('hidden');
 }
 const badgeEstado = e => e === 'al_dia' ? ['Al día','bg-emerald-900/50 text-emerald-400 border-emerald-700']
@@ -349,7 +365,7 @@ function resolverPago(apto, pid, estatus) {
     batch.update(ref, { estado: 'al_dia' });
     const p = (pagosPorApto[apto] || []).find(x => x.pid === pid);
     if (p) batch.set(base().collection('movimientos').doc('pago_' + pid), {
-      tipo: 'ingreso', fecha: p.fecha, concepto: `Pago condominio Apt ${apto} (Ref ${p.referencia})`, categoria: 'Cuotas de condominio',
+      tipo: 'ingreso', fecha: p.fecha, concepto: `Cuota de condominio Apt ${apto}`, categoria: 'Cuotas de condominio',
       monto: p.monto, moneda: p.moneda || 'USD', apto, origen: 'pago', creadoEn: firebase.firestore.FieldValue.serverTimestamp()
     });
   }
@@ -364,31 +380,72 @@ function cargarFinanzas() {
   if (!$('fin-mes').value) $('fin-mes').value = hoy().slice(0, 7);
   if (unsubFin) unsubFin();
   unsubFin = base().collection('movimientos').orderBy('fecha', 'desc').onSnapshot(snap => {
-    movimientos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderFinanzas();
+    movimientos = snap.docs.map(d => ({ id: d.id, ...d.data() })); renderFinanzas(); renderTransp();
   }, err => alert('Error cargando finanzas: ' + err.message));
 }
 const money = (n, m) => (m === 'Bs' ? 'Bs ' : '$') + n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-function renderFinanzas() {
-  const mes = $('fin-mes').value;
-  const lista = movimientos.filter(m => !mes || (m.fecha || '').startsWith(mes));
-  const monedas = ['USD', 'Bs'].filter(c => lista.some(m => (m.moneda || 'USD') === c));
-  if (!monedas.length) monedas.push('USD');
-  $('fin-resumen').innerHTML = monedas.map(c => {
-    const ing = lista.filter(m => (m.moneda || 'USD') === c && m.tipo === 'ingreso').reduce((a, m) => a + Number(m.monto || 0), 0);
-    const gas = lista.filter(m => (m.moneda || 'USD') === c && m.tipo === 'gasto').reduce((a, m) => a + Number(m.monto || 0), 0);
-    return `<div class="bg-gray-900 border border-gray-800 rounded-xl p-5"><p class="text-xs text-gray-400 mb-3">Resumen en ${c === 'Bs' ? 'bolívares' : 'dólares'}</p>
-      <div class="grid grid-cols-3 gap-2 text-sm"><div><p class="text-xs text-gray-500">Ingresos</p><p class="font-bold text-emerald-400">${money(ing, c)}</p></div>
-      <div><p class="text-xs text-gray-500">Gastos</p><p class="font-bold text-rose-400">${money(gas, c)}</p></div>
-      <div><p class="text-xs text-gray-500">Balance</p><p class="font-bold ${ing - gas >= 0 ? 'text-white' : 'text-rose-500'}">${money(ing - gas, c)}</p></div></div></div>`;
-  }).join('');
-  $('fin-lista').innerHTML = lista.length ? lista.map(m => `
+const delMes = mes => movimientos.filter(m => !mes || (m.fecha || '').startsWith(mes));
+const monedasDe = l => { const r = ['USD', 'Bs'].filter(c => l.some(m => (m.moneda || 'USD') === c)); return r.length ? r : ['USD']; };
+const totales = (l, c) => {
+  const sum = t => l.filter(m => (m.moneda || 'USD') === c && m.tipo === t).reduce((a, m) => a + Number(m.monto || 0), 0);
+  const ing = sum('ingreso'), gas = sum('gasto'); return { ing, gas, bal: ing - gas };
+};
+function pintarFinanzas(mes, elResumen, elLista, admin) {
+  const lista = delMes(mes);
+  elResumen.innerHTML = monedasDe(lista).map(c => { const t = totales(lista, c); return `
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5"><p class="text-xs text-gray-400 mb-3">Resumen en ${c === 'Bs' ? 'bolívares' : 'dólares'}</p>
+    <div class="grid grid-cols-3 gap-2 text-sm"><div><p class="text-xs text-gray-500">Ingresos</p><p class="font-bold text-emerald-400">${money(t.ing, c)}</p></div>
+    <div><p class="text-xs text-gray-500">Gastos</p><p class="font-bold text-rose-400">${money(t.gas, c)}</p></div>
+    <div><p class="text-xs text-gray-500">Balance</p><p class="font-bold ${t.bal >= 0 ? 'text-white' : 'text-rose-500'}">${money(t.bal, c)}</p></div></div></div>`; }).join('');
+  elLista.innerHTML = lista.length ? lista.map(m => `
     <div class="bg-gray-900 border border-gray-800 p-3 rounded-lg flex justify-between items-center gap-3">
       <div class="min-w-0"><p class="text-sm font-medium truncate">${esc(m.concepto)}</p>
-      <p class="text-xs text-gray-500">${esc(m.fecha)} · ${esc(m.categoria)}${m.origen === 'pago' ? ' · automático' : ''}</p></div>
+      <p class="text-xs text-gray-500">${esc(m.fecha)} · ${esc(m.categoria)}${admin && m.origen === 'pago' ? ' · automático' : ''}</p></div>
       <div class="flex items-center gap-3 shrink-0"><p class="text-sm font-semibold ${m.tipo === 'ingreso' ? 'text-emerald-400' : 'text-rose-400'}">${m.tipo === 'ingreso' ? '+' : '−'}${money(Number(m.monto || 0), m.moneda)}</p>
-      <button onclick="eliminarMovimiento('${esc(m.id)}')" class="text-xs text-gray-500 hover:text-rose-400">Eliminar</button></div></div>`).join('')
+      ${admin ? `<button onclick="eliminarMovimiento('${esc(m.id)}')" class="text-xs text-gray-500 hover:text-rose-400">Eliminar</button>` : ''}</div></div>`).join('')
     : '<p class="text-sm text-gray-500">No hay movimientos en este mes.</p>';
 }
+function renderFinanzas() { pintarFinanzas($('fin-mes').value, $('fin-resumen'), $('fin-lista'), true); }
+function renderTransp() { if (!$('tr-mes').value) $('tr-mes').value = hoy().slice(0, 7); pintarFinanzas($('tr-mes').value, $('tr-resumen'), $('tr-lista'), false); }
+
+// ---------- EXPORTAR / COMPARTIR ----------
+function exportarCSV() {
+  const mes = $('fin-mes').value, q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const filas = [['Fecha','Tipo','Concepto','Categoría','Monto','Moneda'].map(q).join(',')]
+    .concat(delMes(mes).slice().reverse().map(m => [m.fecha, m.tipo, m.concepto, m.categoria, m.monto, m.moneda || 'USD'].map(q).join(',')));
+  const url = URL.createObjectURL(new Blob(['\ufeff' + filas.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = `terraza12-finanzas-${mes || 'todo'}.csv`; a.click(); URL.revokeObjectURL(url);
+}
+function imprimirFinanzas() {
+  const mes = $('fin-mes').value, l = delMes(mes);
+  const res = monedasDe(l).map(c => { const t = totales(l, c); return `<p><b>${c}:</b> Ingresos ${money(t.ing, c)} · Gastos ${money(t.gas, c)} · Balance ${money(t.bal, c)}</p>`; }).join('');
+  const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes para imprimir.');
+  w.document.write(`<html><head><title>Terraza 12 - ${esc(mes)}</title><style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #ccc;padding:6px;text-align:left}</style></head><body>
+    <h2>Condominio Terraza 12 – Relación de gastos e ingresos ${esc(mes)}</h2>${res}
+    <table><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Categoría</th><th>Monto</th></tr>${l.slice().reverse().map(m =>
+      `<tr><td>${esc(m.fecha)}</td><td>${esc(m.tipo)}</td><td>${esc(m.concepto)}</td><td>${esc(m.categoria)}</td><td>${money(Number(m.monto || 0), m.moneda)}</td></tr>`).join('')}</table></body></html>`);
+  w.document.close(); w.print();
+}
+function textoResumen() {
+  const mes = $('fin-mes').value, l = delMes(mes);
+  let t = `*Condominio Terraza 12 – Relación de gastos e ingresos ${mes}*\n`;
+  monedasDe(l).forEach(c => { const x = totales(l, c); t += `\n${c}: Ingresos ${money(x.ing, c)} | Gastos ${money(x.gas, c)} | Balance ${money(x.bal, c)}`; });
+  const g = l.filter(m => m.tipo === 'gasto').reverse();
+  if (g.length) t += '\n\n*Gastos:*\n' + g.map(m => `• ${m.fecha} ${m.concepto}: ${money(Number(m.monto || 0), m.moneda)}`).join('\n');
+  return t + `\n\nVer en vivo: ${location.origin}`;
+}
+function compartirWhatsApp() { window.open('https://wa.me/?text=' + encodeURIComponent(textoResumen()), '_blank'); }
+function telWa(t) { let n = String(t || '').replace(/\D/g, ''); if (n.startsWith('0')) n = '58' + n.slice(1); return n; }
+function toggleWaPanel() {
+  const p = $('wa-panel'); p.classList.toggle('hidden'); if (p.classList.contains('hidden')) return;
+  const txt = encodeURIComponent(textoResumen());
+  p.innerHTML = cacheApts.filter(a => a.propietario).map(a => telWa(a.telefono).length >= 10
+    ? `<div class="flex justify-between items-center bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs"><span>Apt ${esc(a.id)} · ${esc(a.propietario)}</span>
+       <a target="_blank" href="https://wa.me/${telWa(a.telefono)}?text=${txt}" class="text-emerald-400 hover:text-emerald-300 font-medium">Enviar</a></div>`
+    : `<div class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-500">Apt ${esc(a.id)} · ${esc(a.propietario)} · sin teléfono válido</div>`).join('')
+    || '<p class="text-xs text-gray-500">No hay apartamentos con propietario asignado.</p>';
+}
+
 function guardarMovimiento(e) {
   e.preventDefault();
   base().collection('movimientos').add({
