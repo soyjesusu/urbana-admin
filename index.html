@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Urbana - Terraza 12</title>
+<title>Urbana</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -16,11 +16,12 @@
 <header class="bg-gray-900 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
   <div class="flex items-center space-x-3">
     <div class="bg-blue-600 rounded-lg w-10 h-10 flex items-center justify-center font-bold text-lg text-white">U</div>
-    <div><h1 class="font-bold text-lg text-white leading-tight">Urbana</h1><p class="text-xs text-gray-400">Terraza 12</p></div>
+    <div><h1 class="font-bold text-lg text-white leading-tight">Urbana</h1><p id="condo-nombre" class="text-xs text-gray-400"></p></div>
   </div>
   <div id="user-session-info" class="hidden items-center space-x-4">
     <span id="user-email" class="bg-gray-800 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-full"></span>
     <span id="user-role-badge" class="bg-blue-900/60 text-blue-300 border border-blue-700 text-xs px-2.5 py-1 rounded-full font-medium"></span>
+    <button id="btn-plat" onclick="abrirPlataforma()" class="hidden text-xs bg-purple-700 hover:bg-purple-600 text-white px-3 py-1.5 rounded-lg font-medium">Plataforma</button>
     <button id="btn-vista" onclick="cambiarVista()" class="hidden text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg font-medium"></button>
     <button id="btn-invitar" onclick="abrirInvitar()" class="hidden text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-medium">Invitar vecino</button>
     <button onclick="cerrarSesion()" class="text-xs text-red-400 hover:text-red-300 font-medium">Cerrar Sesión</button>
@@ -69,10 +70,11 @@
 
   <div id="admin-apts">
     <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-bold">Apartamentos de Terraza 12</h2>
+      <h2 class="text-xl font-bold">Apartamentos</h2>
       <div class="flex flex-wrap gap-2">
         <button onclick="abrirEditorApto()" class="px-3 py-1.5 rounded-lg text-xs bg-blue-600 hover:bg-blue-500 text-white">+ Nuevo apartamento</button>
         <button onclick="abrirImportar()" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-700 hover:bg-emerald-600 text-white">⬆ Importar lista</button>
+        <button onclick="sincronizarAccesos()" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700">🔑 Sincronizar accesos</button>
         <button onclick="filtrarApartamentos('todos')" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-300 border border-gray-700">Todos</button>
         <button onclick="filtrarApartamentos('al_dia')" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-950/40 text-emerald-400 border border-emerald-800">Al Día</button>
         <button onclick="filtrarApartamentos('con_deuda')" class="px-3 py-1.5 rounded-lg text-xs bg-rose-950/40 text-rose-400 border border-rose-800">Con Deuda</button>
@@ -193,7 +195,7 @@
 <div id="modal-invitar" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
   <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm text-center space-y-3">
     <h3 class="text-lg font-bold">Invitar a un vecino</h3>
-    <p class="text-xs text-gray-400">Quien escanee este código abre la app de Terraza 12.</p>
+    <p class="text-xs text-gray-400">Quien escanee este código abre la app de tu condominio.</p>
     <div class="inline-block bg-white p-3 rounded-xl"><div id="inv-qr"></div></div>
     <p id="inv-url" class="text-xs text-gray-400 break-all"></p>
     <div class="grid grid-cols-2 gap-2">
@@ -236,6 +238,24 @@
   </div>
 </div>
 
+<div id="modal-plat" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto space-y-4">
+    <h3 class="text-lg font-bold">Plataforma: condominios</h3>
+    <div id="plat-lista" class="space-y-2"></div>
+    <form onsubmit="crearCondominio(event)" class="border-t border-gray-800 pt-4 grid grid-cols-2 gap-3">
+      <p class="col-span-2 text-sm font-semibold">Nuevo condominio</p>
+      <input id="pc-id" required placeholder="Identificador (ej: altavista)" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+      <input id="pc-nombre" required placeholder="Nombre" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+      <input id="pc-rif" placeholder="RIF" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+      <input id="pc-dir" placeholder="Dirección" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+      <input type="email" id="pc-admin" required placeholder="Correo del administrador" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+      <select id="pc-moneda" class="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm"><option>USD</option><option>Bs</option></select>
+      <button type="submit" class="col-span-2 bg-purple-700 hover:bg-purple-600 text-white py-2.5 rounded-lg text-sm font-medium">Crear condominio</button>
+    </form>
+    <button onclick="show('modal-plat', false)" class="w-full text-xs text-gray-400 hover:text-white">Cerrar</button>
+  </div>
+</div>
+
 <div id="modal-apto" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
   <form onsubmit="guardarApto(event)" class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md space-y-3">
     <h3 id="ma-titulo" class="text-lg font-bold">Editar apartamento</h3>
@@ -270,7 +290,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const auth = firebase.auth();
-const base = () => db.collection('condominios').doc('terraza12');
+let CONDO = null, usuario = null;
+const base = () => db.collection('condominios').doc(CONDO);
 
 let condo = {}, miApto = {}, recibosMiembro = [], aptoNum = null, unsubApts = null, unsubPagos = [], cacheApts = [], filtroActual = 'todos';
 
@@ -292,26 +313,36 @@ function modoVista(m) {
 }
 function cambiarVista() { modoVista(vistaActual === 'admin' ? 'miembro' : 'admin'); }
 
-auth.onAuthStateChanged(async user => {
+async function entrarCondo(user) {
+  const email = (user.email || '').toLowerCase();
+  if (unsubApts) unsubApts(); if (unsubFin) unsubFin(); unsubPagos.forEach(u => u());
+  unsubApts = unsubFin = null; unsubPagos = []; cacheApts = []; movimientos = []; pagosPorApto = {}; aptoNum = null; miApto = {};
+  try { usuario = (await db.collection('usuarios').doc(email).get()).data(); } catch (e) { usuario = null; }
+  if (!usuario || !usuario.condoId) { alert('Tu correo no está asociado a ningún condominio. Contacta a tu administrador.'); auth.signOut(); return; }
+  const esSuper = usuario.rol === 'superadmin';
+  if (!(esSuper && CONDO)) CONDO = usuario.condoId;
+  try { condo = (await base().get()).data() || {}; } catch (e) { condo = {}; }
+  $('condo-nombre').textContent = condo.nombre || CONDO; document.title = 'Urbana - ' + (condo.nombre || '');
+  $('btn-plat').classList.toggle('hidden', !esSuper); $('btn-vista').classList.add('hidden');
+  if ($('rec-mes') && !$('rec-mes').value) $('rec-mes').value = hoy().slice(0, 7);
+  if (esSuper || esAdminEmail(email)) {
+    modoVista('admin');
+    base().collection('apartamentos').where('correo', '==', email).get()
+      .then(sn => { if (!sn.empty) $('btn-vista').classList.remove('hidden'); }).catch(() => {});
+  } else modoVista('miembro');
+}
+auth.onAuthStateChanged(user => {
   ['vista-admin','vista-miembro'].forEach(v => show(v, false));
-  $('btn-invitar').classList.add('hidden'); $('btn-vista').classList.add('hidden');
+  $('btn-invitar').classList.add('hidden'); $('btn-vista').classList.add('hidden'); $('btn-plat').classList.add('hidden');
   if (!user) {
-    show('vista-login', true);
+    CONDO = null; show('vista-login', true);
     $('user-session-info').classList.add('hidden'); $('user-session-info').classList.remove('flex');
     return;
   }
   show('vista-login', false);
   $('user-session-info').classList.remove('hidden'); $('user-session-info').classList.add('flex');
   $('user-email').textContent = user.email;
-  try { condo = (await base().get()).data() || {}; } catch (e) { condo = {}; }
-  if ($('rec-mes') && !$('rec-mes').value) $('rec-mes').value = hoy().slice(0, 7);
-  const email = (user.email || '').toLowerCase();
-  if (esAdminEmail(email)) {
-    modoVista('admin');
-    // si el administrador también es propietario, puede alternar entre las dos vistas
-    base().collection('apartamentos').where('correo', '==', email).get()
-      .then(sn => { if (!sn.empty) $('btn-vista').classList.remove('hidden'); }).catch(() => {});
-  } else modoVista('miembro');
+  entrarCondo(user);
 });
 
 function iniciarSesion(e) {
@@ -386,7 +417,7 @@ function imprimirRecibo(id) {
     table{width:100%;border-collapse:collapse;margin:16px 0}td{padding:8px;border-bottom:1px solid #ddd}
     .t{font-size:20px;font-weight:bold;text-align:right}.s{display:inline-block;padding:4px 12px;border:2px solid;font-weight:bold;color:${r.pagado ? '#047857' : '#be123c'}}
     </style></head><body>
-    <div class="h"><div><h2 style="margin:0">${esc(condo.nombre || 'Condominio Terraza 12')}</h2><div>RIF: ${esc(condo.rif || '')}</div><div>${esc(condo.direccion || '')}</div></div>
+    <div class="h"><div><h2 style="margin:0">${esc(condo.nombre || 'Condominio')}</h2><div>RIF: ${esc(condo.rif || '')}</div><div>${esc(condo.direccion || '')}</div></div>
     <div style="text-align:right"><b>RECIBO</b><div>N° ${esc(r.numero || id)}</div><div>Emisión: ${esc(r.emision || '')}</div></div></div>
     <p><b>Apartamento:</b> ${esc(miApto.numero || aptoNum)}<br><b>Propietario:</b> ${esc(miApto.propietario || '')}<br><b>Periodo:</b> ${esc(r.periodo || id)}${r.vencimiento ? '<br><b>Vence:</b> ' + esc(r.vencimiento) : ''}</p>
     <table><tr><td>${esc(r.concepto || 'Cuota de condominio')}</td><td class="t">${money(Number(r.monto || 0), r.moneda)}</td></tr></table>
@@ -450,10 +481,10 @@ function abrirInvitar() {
   new QRCode(box, { text: url, width: 240, height: 240, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
   show('modal-invitar', true);
 }
-const msgInvitar = () => `Hola, te invito a usar la app del Condominio Terraza 12: ahí puedes ver tus recibos, reportar pagos y consultar los gastos del condominio.\n\n${location.origin}\n\nEntra con el correo que registraste en la administración.`;
+const msgInvitar = () => `Hola, te invito a usar la app de ${condo.nombre || 'tu condominio'}: ahí puedes ver tus recibos, reportar pagos y consultar los gastos del condominio.\n\n${location.origin}\n\nEntra con el correo que registraste en la administración.`;
 const qrDataUrl = () => { const c = $('inv-qr').querySelector('canvas'); return c ? c.toDataURL('image/png') : $('inv-qr').querySelector('img').src; };
 function copiarEnlace() { navigator.clipboard.writeText(location.origin).then(() => alert('Enlace copiado.')).catch(() => prompt('Copia el enlace:', location.origin)); }
-function descargarQR() { const a = document.createElement('a'); a.href = qrDataUrl(); a.download = 'qr-terraza12.png'; a.click(); }
+function descargarQR() { const a = document.createElement('a'); a.href = qrDataUrl(); a.download = 'qr-condominio.png'; a.click(); }
 function enviarInvitacionWA() {
   const t = telWa($('inv-tel').value);
   if (t.length < 10) return alert('Escribe un teléfono válido, por ejemplo 0414-1234567.');
@@ -461,7 +492,7 @@ function enviarInvitacionWA() {
 }
 async function compartirQR() {
   try {
-    const blob = await (await fetch(qrDataUrl())).blob(), file = new File([blob], 'qr-terraza12.png', { type: 'image/png' });
+    const blob = await (await fetch(qrDataUrl())).blob(), file = new File([blob], 'qr-condominio.png', { type: 'image/png' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ files: [file], text: msgInvitar() });
   } catch (e) { if (e.name === 'AbortError') return; }
   window.open('https://wa.me/?text=' + encodeURIComponent(msgInvitar()), '_blank');
@@ -574,9 +605,50 @@ async function confirmarImport() {
       });
       await batch.commit();
     }
+    await asegurarUsuarios(ok.map(f => f.correo));
     alert(`Listo: ${ok.length} apartamentos importados.`); show('modal-import', false);
   } catch (e) { alert('Error al importar: ' + e.message); }
   b.disabled = false;
+}
+
+// ---------- ACCESOS Y PLATAFORMA ----------
+async function asegurarUsuarios(correos) {
+  const lista = [...new Set(correos.filter(Boolean).map(c => c.trim().toLowerCase()))];
+  if (!lista.length) return 0;
+  const ex = await Promise.all(lista.map(c => db.collection('usuarios').doc(c).get()));
+  const batch = db.batch(); let n = 0;
+  lista.forEach((c, i) => { if (!ex[i].exists) { batch.set(db.collection('usuarios').doc(c), { condoId: CONDO, rol: 'propietario' }); n++; } });
+  if (n) await batch.commit();
+  return n;
+}
+function sincronizarAccesos() {
+  asegurarUsuarios(cacheApts.map(a => a.correo)).then(n => alert(n ? `Se habilitó el acceso de ${n} vecinos.` : 'Todos los vecinos ya tienen acceso habilitado.')).catch(e => alert('Error: ' + e.message));
+}
+async function abrirPlataforma() {
+  show('modal-plat', true); $('plat-lista').innerHTML = '<p class="text-xs text-gray-500">Cargando…</p>';
+  try {
+    const sn = await db.collection('condominios').get();
+    $('plat-lista').innerHTML = sn.docs.map(d => `<div class="flex justify-between items-center bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm">
+      <span>${esc(d.data().nombre || d.id)} <span class="text-xs text-gray-500">· ${esc(d.id)} · ${esc(d.data().administradorEmail || '')}</span></span>
+      <button onclick="irACondo('${esc(d.id)}')" class="text-xs ${d.id === CONDO ? 'text-emerald-400' : 'text-blue-400'}">${d.id === CONDO ? 'Actual' : 'Abrir'}</button></div>`).join('');
+  } catch (e) { $('plat-lista').innerHTML = `<p class="text-xs text-rose-400">Error: ${esc(e.message)}</p>`; }
+}
+function irACondo(id) { CONDO = id; show('modal-plat', false); entrarCondo(auth.currentUser); }
+async function crearCondominio(e) {
+  e.preventDefault();
+  const id = $('pc-id').value.trim().toLowerCase(), adm = $('pc-admin').value.trim().toLowerCase();
+  if (!/^[a-z0-9-]{3,30}$/.test(id)) return alert('El identificador usa 3 a 30 letras minúsculas, números o guiones, sin espacios ni tildes.');
+  try {
+    const ref = db.collection('condominios').doc(id);
+    if ((await ref.get()).exists) return alert('Ya existe un condominio con ese identificador.');
+    const u = await db.collection('usuarios').doc(adm).get();
+    if (u.exists && u.data().condoId !== id) return alert('Ese correo ya pertenece a otro condominio.');
+    await ref.set({ nombre: $('pc-nombre').value.trim(), rif: $('pc-rif').value.trim(), direccion: $('pc-dir').value.trim(),
+      monedaPrincipal: $('pc-moneda').value, administradorEmail: adm, activo: true, fechaCreacion: firebase.firestore.FieldValue.serverTimestamp() });
+    await db.collection('usuarios').doc(adm).set({ condoId: id, rol: 'admin' });
+    e.target.reset(); abrirPlataforma();
+    alert(`Condominio creado. Crea el usuario ${adm} en Authentication → Usuarios y entrégale su clave.`);
+  } catch (err) { alert('Error: ' + err.message); }
 }
 
 let editandoApto = null;
@@ -598,6 +670,7 @@ async function guardarApto(e) {
     if (!editandoApto && (await ref.get()).exists) return alert('Ya existe un apartamento con ese número.');
     await ref.set({ numero: id, propietario: $('ma-prop').value.trim(), telefono: $('ma-tel').value.trim(),
       correo: $('ma-correo').value.trim().toLowerCase(), estado: $('ma-estado').value }, { merge: true });
+    await asegurarUsuarios([$('ma-correo').value]);
     cerrarModalApto();
   } catch (err) { alert('Error al guardar: ' + err.message); }
 }
@@ -722,21 +795,21 @@ function exportarCSV() {
   const filas = [['Fecha','Tipo','Concepto','Categoría','Monto','Moneda'].map(q).join(',')]
     .concat(delMes(mes).slice().reverse().map(m => [m.fecha, m.tipo, m.concepto, m.categoria, m.monto, m.moneda || 'USD'].map(q).join(',')));
   const url = URL.createObjectURL(new Blob(['\ufeff' + filas.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a'); a.href = url; a.download = `terraza12-finanzas-${mes || 'todo'}.csv`; a.click(); URL.revokeObjectURL(url);
+  const a = document.createElement('a'); a.href = url; a.download = `${CONDO}-finanzas-${mes || 'todo'}.csv`; a.click(); URL.revokeObjectURL(url);
 }
 function imprimirFinanzas() {
   const mes = $('fin-mes').value, l = delMes(mes);
   const res = monedasDe(l).map(c => { const t = totales(l, c); return `<p><b>${c}:</b> Ingresos ${money(t.ing, c)} · Gastos ${money(t.gas, c)} · Balance ${money(t.bal, c)}</p>`; }).join('');
   const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes para imprimir.');
-  w.document.write(`<html><head><title>Terraza 12 - ${esc(mes)}</title><style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #ccc;padding:6px;text-align:left}</style></head><body>
-    <h2>Condominio Terraza 12 – Relación de gastos e ingresos ${esc(mes)}</h2>${res}
+  w.document.write(`<html><head><title>${esc(condo.nombre || "")} - ${esc(mes)}</title><style>body{font-family:sans-serif;padding:24px}table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #ccc;padding:6px;text-align:left}</style></head><body>
+    <h2>${esc(condo.nombre || 'Condominio')} – Relación de gastos e ingresos ${esc(mes)}</h2>${res}
     <table><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Categoría</th><th>Monto</th></tr>${l.slice().reverse().map(m =>
       `<tr><td>${esc(m.fecha)}</td><td>${esc(m.tipo)}</td><td>${esc(m.concepto)}</td><td>${esc(m.categoria)}</td><td>${money(Number(m.monto || 0), m.moneda)}</td></tr>`).join('')}</table></body></html>`);
   w.document.close(); w.print();
 }
 function textoResumen() {
   const mes = $('fin-mes').value, l = delMes(mes);
-  let t = `*Condominio Terraza 12 – Relación de gastos e ingresos ${mes}*\n`;
+  let t = `*${condo.nombre || 'Condominio'} – Relación de gastos e ingresos ${mes}*\n`;
   monedasDe(l).forEach(c => { const x = totales(l, c); t += `\n${c}: Ingresos ${money(x.ing, c)} | Gastos ${money(x.gas, c)} | Balance ${money(x.bal, c)}`; });
   const g = l.filter(m => m.tipo === 'gasto').reverse();
   if (g.length) t += '\n\n*Gastos:*\n' + g.map(m => `• ${m.fecha} ${m.concepto}: ${money(Number(m.monto || 0), m.moneda)}`).join('\n');
