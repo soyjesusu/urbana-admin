@@ -210,11 +210,15 @@
 <div id="modal-import" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
   <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-3">
     <h3 class="text-lg font-bold">Importar apartamentos</h3>
-    <ol class="text-xs text-gray-400 list-decimal pl-4 space-y-1">
-      <li>Descarga la plantilla y llénala en Google Sheets o Excel (una fila por apartamento).</li>
-      <li>Selecciona las celdas en la hoja, cópialas y pégalas abajo. O sube el archivo CSV.</li>
-      <li>Pulsa <b>Revisar</b>: verás qué se creará, qué se actualizará y qué tiene errores. Nada se guarda todavía.</li>
-    </ol>
+    <div class="bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs text-gray-300 space-y-2">
+      <p><b>Paso 1.</b> Descarga la plantilla y ábrela en Google Sheets o Excel. <b>Paso 2.</b> Escribe un apartamento por fila y borra las filas de ejemplo. <b>Paso 3.</b> Copia las celdas y pégalas aquí abajo (o sube el archivo).</p>
+      <div class="overflow-x-auto"><table class="w-full text-[11px] border border-gray-700">
+        <tr class="bg-gray-800 text-gray-200"><th class="p-1.5 border border-gray-700 text-left">Apartamento</th><th class="p-1.5 border border-gray-700 text-left">Nombre del propietario</th><th class="p-1.5 border border-gray-700 text-left">Teléfono (WhatsApp)</th><th class="p-1.5 border border-gray-700 text-left">Correo electrónico</th><th class="p-1.5 border border-gray-700 text-left">Estado</th></tr>
+        <tr class="text-gray-400"><td class="p-1.5 border border-gray-700">1A</td><td class="p-1.5 border border-gray-700">Juan Pérez</td><td class="p-1.5 border border-gray-700">0414-1234567</td><td class="p-1.5 border border-gray-700">juan@gmail.com</td><td class="p-1.5 border border-gray-700">Al día</td></tr>
+        <tr class="text-gray-400"><td class="p-1.5 border border-gray-700">1B</td><td class="p-1.5 border border-gray-700"></td><td class="p-1.5 border border-gray-700"></td><td class="p-1.5 border border-gray-700"></td><td class="p-1.5 border border-gray-700">Vacío</td></tr>
+      </table></div>
+      <p class="text-gray-400">Solo <b>Apartamento</b> es obligatorio. En <b>Estado</b> escribe <i>Al día</i>, <i>Debe</i> o <i>Vacío</i> (si lo dejas en blanco, se asigna solo). El correo debe ser el mismo con el que el vecino entrará a la app.</p>
+    </div>
     <div class="flex flex-wrap gap-2">
       <button onclick="descargarPlantilla()" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700">⬇ Descargar plantilla</button>
       <label class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700 cursor-pointer">📁 Subir CSV
@@ -452,8 +456,8 @@ async function compartirQR() {
 // ---------- IMPORTAR APARTAMENTOS ----------
 let impFilas = [];
 const COLS = ['numero', 'propietario', 'telefono', 'correo', 'estado', 'torre', 'piso', 'cedula'];
-const ALIAS = { numero: ['numero','apartamento','apto','apt','nro','n','id'], propietario: ['propietario','nombre','dueno','titular'],
-  telefono: ['telefono','tel','celular','whatsapp','movil'], correo: ['correo','email','mail','correoelectronico'], estado: ['estado','status'],
+const ALIAS = { numero: ['numero','apartamento','apto','apt','nro','n','id','inmueble'], propietario: ['propietario','nombre','dueno','titular','nombredelpropietario','nombreypropietario'],
+  telefono: ['telefono','tel','celular','whatsapp','movil','telefonowhatsapp','telefonocelular'], correo: ['correo','email','mail','correoelectronico','emailcorreo'], estado: ['estado','status'],
   torre: ['torre','bloque','edificio'], piso: ['piso'], cedula: ['cedula','rif','ci','documento'] };
 const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
 function parseDelim(t, d) {
@@ -471,7 +475,7 @@ function parseDelim(t, d) {
 }
 function abrirImportar() { $('imp-texto').value = ''; $('imp-preview').innerHTML = ''; $('imp-ok').classList.add('hidden'); impFilas = []; show('modal-import', true); }
 function descargarPlantilla() {
-  const csv = 'numero,propietario,telefono,correo,estado,torre,piso,cedula\r\n1A,Maria Perez,0414-1234567,maria@correo.com,al_dia,A,1,V-12345678\r\n1B,,,,vacio,A,1,\r\n';
+  const csv = 'Apartamento,Nombre del propietario,Teléfono (WhatsApp),Correo electrónico,Estado\r\n1A,Ejemplo: Juan Pérez (borrar esta fila),0414-1234567,juan@gmail.com,Al día\r\n1B,,,,Vacío\r\n';
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
   a.download = 'plantilla-apartamentos.csv'; a.click();
 }
@@ -483,7 +487,7 @@ function normEstado(v, tienePropietario) {
   const n = norm(v);
   if (!n) return null;
   if (n.includes('aldia') || n === 'ok' || n === 'solvente') return 'al_dia';
-  if (n.includes('deuda') || n === 'moroso') return 'con_deuda';
+  if (n.includes('deuda') || n === 'moroso' || n.startsWith('debe') || n.startsWith('pend')) return 'con_deuda';
   if (n.startsWith('vac')) return 'vacio';
   return undefined;
 }
@@ -506,11 +510,12 @@ function revisarImport() {
     const f = { fila: n + 1, id: g('numero'), propietario: g('propietario'), telefono: g('telefono'), correo: g('correo').toLowerCase(),
       torre: g('torre'), piso: g('piso'), cedula: g('cedula'), estadoRaw: g('estado'), err: '', aviso: '' };
     f.estado = normEstado(f.estadoRaw);
-    if (!f.id) f.err = 'Falta el número';
+    if (/ejemplo/i.test(f.propietario)) f.err = 'Fila de ejemplo (se omite)';
+    else if (!f.id) f.err = 'Falta el número';
     else if (/[\/\\]/.test(f.id) || f.id === '.' || f.id === '..') f.err = 'Número con caracteres no permitidos';
     else if (vistos.has(f.id)) f.err = 'Número repetido en la lista';
     else if (f.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.correo)) f.err = 'Correo inválido';
-    else if (f.estado === undefined) f.err = 'Estado no reconocido (usa al_dia, con_deuda o vacio)';
+    else if (f.estado === undefined) f.err = 'Estado no reconocido (usa Al día, Debe o Vacío)';
     vistos.add(f.id);
     if (!f.err && f.telefono && f.telefono.replace(/\D/g, '').length < 10) f.aviso = 'Teléfono corto';
     f.nuevo = !existentes.has(f.id);
