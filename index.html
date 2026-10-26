@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Urbana - Terraza 12</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -19,6 +20,7 @@
   <div id="user-session-info" class="hidden items-center space-x-4">
     <span id="user-email" class="bg-gray-800 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-full"></span>
     <span id="user-role-badge" class="bg-blue-900/60 text-blue-300 border border-blue-700 text-xs px-2.5 py-1 rounded-full font-medium"></span>
+    <button id="btn-invitar" onclick="abrirInvitar()" class="hidden text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-medium">Invitar vecino</button>
     <button onclick="cerrarSesion()" class="text-xs text-red-400 hover:text-red-300 font-medium">Cerrar Sesión</button>
   </div>
 </header>
@@ -185,6 +187,25 @@
 </section>
 </div>
 
+<div id="modal-invitar" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm text-center space-y-3">
+    <h3 class="text-lg font-bold">Invitar a un vecino</h3>
+    <p class="text-xs text-gray-400">Quien escanee este código abre la app de Terraza 12.</p>
+    <div class="inline-block bg-white p-3 rounded-xl"><div id="inv-qr"></div></div>
+    <p id="inv-url" class="text-xs text-gray-400 break-all"></p>
+    <div class="grid grid-cols-2 gap-2">
+      <button onclick="copiarEnlace()" class="bg-gray-800 hover:bg-gray-700 py-2 rounded-lg text-xs">Copiar enlace</button>
+      <button onclick="descargarQR()" class="bg-gray-800 hover:bg-gray-700 py-2 rounded-lg text-xs">Descargar QR</button>
+    </div>
+    <button onclick="compartirQR()" class="w-full bg-emerald-700 hover:bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium">Compartir QR por WhatsApp</button>
+    <div class="flex gap-2">
+      <input id="inv-tel" placeholder="Teléfono: 0414-1234567" class="flex-1 min-w-0 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs">
+      <button onclick="enviarInvitacionWA()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 rounded-lg text-xs">Enviar a este número</button>
+    </div>
+    <button onclick="show('modal-invitar', false)" class="w-full text-xs text-gray-400 hover:text-white pt-1">Cerrar</button>
+  </div>
+</div>
+
 <div id="modal-apto" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
   <form onsubmit="guardarApto(event)" class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md space-y-3">
     <h3 id="ma-titulo" class="text-lg font-bold">Editar apartamento</h3>
@@ -231,6 +252,7 @@ const show = (id, v) => $(id).classList.toggle('hidden', !v);
 // ---------- SESIÓN ----------
 auth.onAuthStateChanged(user => {
   ['vista-admin','vista-miembro'].forEach(v => show(v, false));
+  $('btn-invitar').classList.add('hidden');
   if (!user) {
     show('vista-login', true);
     $('user-session-info').classList.add('hidden'); $('user-session-info').classList.remove('flex');
@@ -242,7 +264,7 @@ auth.onAuthStateChanged(user => {
   $('user-email').textContent = user.email;
   const email = (user.email || '').toLowerCase();
   if (ADMINS.includes(email)) {
-    $('user-role-badge').textContent = 'Administrador';
+    $('user-role-badge').textContent = 'Administrador'; $('btn-invitar').classList.remove('hidden');
     show('vista-admin', true); cargarDashboardAdmin();
   } else {
     $('user-role-badge').textContent = 'Propietario';
@@ -379,6 +401,28 @@ function cargarDashboardAdmin() {
     renderGrid();
     escucharPagosAdmin(); 
   }, err => alert('Error cargando apartamentos: ' + err.message));
+}
+
+function abrirInvitar() {
+  const url = location.origin, box = $('inv-qr'); box.innerHTML = ''; $('inv-url').textContent = url;
+  new QRCode(box, { text: url, width: 240, height: 240, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  show('modal-invitar', true);
+}
+const msgInvitar = () => `Hola, te invito a usar la app del Condominio Terraza 12: ahí puedes ver tus recibos, reportar pagos y consultar los gastos del condominio.\n\n${location.origin}\n\nEntra con el correo que registraste en la administración.`;
+const qrDataUrl = () => { const c = $('inv-qr').querySelector('canvas'); return c ? c.toDataURL('image/png') : $('inv-qr').querySelector('img').src; };
+function copiarEnlace() { navigator.clipboard.writeText(location.origin).then(() => alert('Enlace copiado.')).catch(() => prompt('Copia el enlace:', location.origin)); }
+function descargarQR() { const a = document.createElement('a'); a.href = qrDataUrl(); a.download = 'qr-terraza12.png'; a.click(); }
+function enviarInvitacionWA() {
+  const t = telWa($('inv-tel').value);
+  if (t.length < 10) return alert('Escribe un teléfono válido, por ejemplo 0414-1234567.');
+  window.open(`https://wa.me/${t}?text=${encodeURIComponent(msgInvitar())}`, '_blank');
+}
+async function compartirQR() {
+  try {
+    const blob = await (await fetch(qrDataUrl())).blob(), file = new File([blob], 'qr-terraza12.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ files: [file], text: msgInvitar() });
+  } catch (e) { if (e.name === 'AbortError') return; }
+  window.open('https://wa.me/?text=' + encodeURIComponent(msgInvitar()), '_blank');
 }
 
 let editandoApto = null;
