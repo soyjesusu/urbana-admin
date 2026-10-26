@@ -70,6 +70,7 @@
       <h2 class="text-xl font-bold">Apartamentos de Terraza 12</h2>
       <div class="flex flex-wrap gap-2">
         <button onclick="abrirEditorApto()" class="px-3 py-1.5 rounded-lg text-xs bg-blue-600 hover:bg-blue-500 text-white">+ Nuevo apartamento</button>
+        <button onclick="abrirImportar()" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-700 hover:bg-emerald-600 text-white">⬆ Importar lista</button>
         <button onclick="filtrarApartamentos('todos')" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 text-gray-300 border border-gray-700">Todos</button>
         <button onclick="filtrarApartamentos('al_dia')" class="px-3 py-1.5 rounded-lg text-xs bg-emerald-950/40 text-emerald-400 border border-emerald-800">Al Día</button>
         <button onclick="filtrarApartamentos('con_deuda')" class="px-3 py-1.5 rounded-lg text-xs bg-rose-950/40 text-rose-400 border border-rose-800">Con Deuda</button>
@@ -203,6 +204,29 @@
       <button onclick="enviarInvitacionWA()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 rounded-lg text-xs">Enviar a este número</button>
     </div>
     <button onclick="show('modal-invitar', false)" class="w-full text-xs text-gray-400 hover:text-white pt-1">Cerrar</button>
+  </div>
+</div>
+
+<div id="modal-import" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+  <div class="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-3">
+    <h3 class="text-lg font-bold">Importar apartamentos</h3>
+    <ol class="text-xs text-gray-400 list-decimal pl-4 space-y-1">
+      <li>Descarga la plantilla y llénala en Google Sheets o Excel (una fila por apartamento).</li>
+      <li>Selecciona las celdas en la hoja, cópialas y pégalas abajo. O sube el archivo CSV.</li>
+      <li>Pulsa <b>Revisar</b>: verás qué se creará, qué se actualizará y qué tiene errores. Nada se guarda todavía.</li>
+    </ol>
+    <div class="flex flex-wrap gap-2">
+      <button onclick="descargarPlantilla()" class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700">⬇ Descargar plantilla</button>
+      <label class="px-3 py-1.5 rounded-lg text-xs bg-gray-800 border border-gray-700 hover:bg-gray-700 cursor-pointer">📁 Subir CSV
+        <input type="file" accept=".csv,.txt,text/csv" class="hidden" onchange="leerArchivoImport(this)"></label>
+    </div>
+    <textarea id="imp-texto" rows="6" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs font-mono" placeholder="Pega aquí las filas copiadas de tu hoja de cálculo…"></textarea>
+    <div id="imp-preview"></div>
+    <div class="flex gap-2">
+      <button onclick="show('modal-import', false)" class="flex-1 bg-gray-800 hover:bg-gray-700 py-2.5 rounded-lg text-sm">Cerrar</button>
+      <button onclick="revisarImport()" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-lg text-sm font-medium">Revisar</button>
+      <button id="imp-ok" onclick="confirmarImport()" class="hidden flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-lg text-sm font-medium"></button>
+    </div>
   </div>
 </div>
 
@@ -423,6 +447,100 @@ async function compartirQR() {
     if (navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ files: [file], text: msgInvitar() });
   } catch (e) { if (e.name === 'AbortError') return; }
   window.open('https://wa.me/?text=' + encodeURIComponent(msgInvitar()), '_blank');
+}
+
+// ---------- IMPORTAR APARTAMENTOS ----------
+let impFilas = [];
+const COLS = ['numero', 'propietario', 'telefono', 'correo', 'estado', 'torre', 'piso', 'cedula'];
+const ALIAS = { numero: ['numero','apartamento','apto','apt','nro','n','id'], propietario: ['propietario','nombre','dueno','titular'],
+  telefono: ['telefono','tel','celular','whatsapp','movil'], correo: ['correo','email','mail','correoelectronico'], estado: ['estado','status'],
+  torre: ['torre','bloque','edificio'], piso: ['piso'], cedula: ['cedula','rif','ci','documento'] };
+const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+function parseDelim(t, d) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === d) { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && t[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += c;
+  }
+  row.push(cur); rows.push(row);
+  return rows.filter(r => r.some(x => x.trim()));
+}
+function abrirImportar() { $('imp-texto').value = ''; $('imp-preview').innerHTML = ''; $('imp-ok').classList.add('hidden'); impFilas = []; show('modal-import', true); }
+function descargarPlantilla() {
+  const csv = 'numero,propietario,telefono,correo,estado,torre,piso,cedula\r\n1A,Maria Perez,0414-1234567,maria@correo.com,al_dia,A,1,V-12345678\r\n1B,,,,vacio,A,1,\r\n';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'plantilla-apartamentos.csv'; a.click();
+}
+function leerArchivoImport(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const r = new FileReader(); r.onload = () => { $('imp-texto').value = r.result; revisarImport(); }; r.readAsText(f, 'utf-8'); inp.value = '';
+}
+function normEstado(v, tienePropietario) {
+  const n = norm(v);
+  if (!n) return null;
+  if (n.includes('aldia') || n === 'ok' || n === 'solvente') return 'al_dia';
+  if (n.includes('deuda') || n === 'moroso') return 'con_deuda';
+  if (n.startsWith('vac')) return 'vacio';
+  return undefined;
+}
+function revisarImport() {
+  const txt = $('imp-texto').value.replace(/^\ufeff/, '');
+  if (!txt.trim()) return alert('Pega las filas o sube un archivo primero.');
+  const primera = txt.split(/\r?\n/)[0];
+  const d = primera.includes('\t') ? '\t' : (primera.split(';').length > primera.split(',').length ? ';' : ',');
+  let rows = parseDelim(txt, d);
+  let map = {};
+  const hdr = rows[0].map(norm);
+  if (hdr.some(h => ALIAS.numero.includes(h)) && hdr.some(h => ALIAS.propietario.includes(h) || ALIAS.correo.includes(h) || ALIAS.telefono.includes(h))) {
+    COLS.forEach(c => { const i = hdr.findIndex(h => ALIAS[c].includes(h)); if (i >= 0) map[c] = i; });
+    rows = rows.slice(1);
+  } else COLS.forEach((c, i) => map[c] = i);
+  if (map.numero === undefined) return alert('No encuentro la columna "numero". Usa la plantilla.');
+  const vistos = new Set(), existentes = new Set(cacheApts.map(a => a.id));
+  impFilas = rows.map((r, n) => {
+    const g = c => map[c] === undefined ? '' : String(r[map[c]] ?? '').trim();
+    const f = { fila: n + 1, id: g('numero'), propietario: g('propietario'), telefono: g('telefono'), correo: g('correo').toLowerCase(),
+      torre: g('torre'), piso: g('piso'), cedula: g('cedula'), estadoRaw: g('estado'), err: '', aviso: '' };
+    f.estado = normEstado(f.estadoRaw);
+    if (!f.id) f.err = 'Falta el número';
+    else if (/[\/\\]/.test(f.id) || f.id === '.' || f.id === '..') f.err = 'Número con caracteres no permitidos';
+    else if (vistos.has(f.id)) f.err = 'Número repetido en la lista';
+    else if (f.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.correo)) f.err = 'Correo inválido';
+    else if (f.estado === undefined) f.err = 'Estado no reconocido (usa al_dia, con_deuda o vacio)';
+    vistos.add(f.id);
+    if (!f.err && f.telefono && f.telefono.replace(/\D/g, '').length < 10) f.aviso = 'Teléfono corto';
+    f.nuevo = !existentes.has(f.id);
+    return f;
+  });
+  const ok = impFilas.filter(f => !f.err), errs = impFilas.length - ok.length;
+  $('imp-preview').innerHTML = `<p class="text-xs text-gray-400 mb-2">${impFilas.length} filas: <span class="text-emerald-400">${ok.filter(f => f.nuevo).length} nuevas</span> · <span class="text-amber-400">${ok.filter(f => !f.nuevo).length} se actualizarán</span> · <span class="text-rose-400">${errs} con error (se omiten)</span></p>
+    <div class="overflow-x-auto border border-gray-800 rounded-lg"><table class="w-full text-xs"><tr class="text-gray-500 text-left"><th class="p-2">Apt</th><th class="p-2">Propietario</th><th class="p-2">Teléfono</th><th class="p-2">Correo</th><th class="p-2">Estado</th><th class="p-2">Resultado</th></tr>
+    ${impFilas.map(f => `<tr class="border-t border-gray-800"><td class="p-2">${esc(f.id)}</td><td class="p-2">${esc(f.propietario)}</td><td class="p-2">${esc(f.telefono)}</td><td class="p-2">${esc(f.correo)}</td><td class="p-2">${esc(f.estadoRaw)}</td>
+    <td class="p-2 ${f.err ? 'text-rose-400' : f.nuevo ? 'text-emerald-400' : 'text-amber-400'}">${f.err ? esc(f.err) : (f.nuevo ? 'Nuevo' : 'Actualiza') + (f.aviso ? ' · ' + esc(f.aviso) : '')}</td></tr>`).join('')}</table></div>`;
+  const b = $('imp-ok'); b.textContent = `Importar ${ok.length} apartamentos`; b.classList.toggle('hidden', !ok.length);
+}
+async function confirmarImport() {
+  const ok = impFilas.filter(f => !f.err); if (!ok.length) return;
+  if (!confirm(`Se guardarán ${ok.length} apartamentos. ¿Continuar?`)) return;
+  const b = $('imp-ok'); b.disabled = true; b.textContent = 'Guardando…';
+  try {
+    for (let i = 0; i < ok.length; i += 400) {
+      const batch = db.batch();
+      ok.slice(i, i + 400).forEach(f => {
+        const data = { numero: f.id };
+        ['propietario', 'telefono', 'correo', 'torre', 'piso', 'cedula'].forEach(k => { if (f[k]) data[k] = f[k]; });
+        if (f.estado) data.estado = f.estado; else if (f.nuevo) data.estado = f.propietario ? 'al_dia' : 'vacio';
+        batch.set(base().collection('apartamentos').doc(f.id), data, { merge: true });
+      });
+      await batch.commit();
+    }
+    alert(`Listo: ${ok.length} apartamentos importados.`); show('modal-import', false);
+  } catch (e) { alert('Error al importar: ' + e.message); }
+  b.disabled = false;
 }
 
 let editandoApto = null;
