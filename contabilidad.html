@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Contabilidad Básica - Academia Vadillo</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f2f5f4;--panel:#fff;--ink:#1a2b3c;--mute:#5c6d7c;--line:#d3dcd8;--acc:#1d6b4f;--acc-soft:#dcefe7;--track:#dfe6e3}
+@media (prefers-color-scheme:dark){:root{--bg:#101a17;--panel:#16231f;--ink:#e6efeb;--mute:#97aaa2;--line:#2a3d36;--acc:#4fc79a;--acc-soft:#1d3a30;--track:#2a3d36}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 "IBM Plex Sans",system-ui,sans-serif}
+.app{display:grid;grid-template-columns:340px 1fr;min-height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:24px 18px;position:sticky;top:0;height:100vh;overflow:auto}
+h1,h2,h3{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;line-height:1.2}
+h1{font-size:22px;margin:0 0 14px}
+.bar{height:8px;background:var(--track);border-radius:4px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--acc);transition:width .3s}
+.total{font-size:14px;color:var(--mute);margin:6px 0 20px}
+.mod{margin:0 0 18px}
+.mod h3{font-size:16px;margin:0 0 6px;padding-bottom:6px;border-bottom:2px solid var(--line)}
+.lec{display:block;width:100%;text-align:left;background:none;border:0;border-left:3px solid transparent;color:inherit;font:inherit;font-size:15px;padding:8px 8px 8px 10px;cursor:pointer;border-radius:0 6px 6px 0}
+.lec:hover{background:var(--acc-soft)}
+.lec[aria-current=true]{border-left-color:var(--acc);background:var(--acc-soft);font-weight:600}
+.lec .mini{height:4px;margin-top:6px}
+.lec.done::after{content:" ✔";color:var(--acc)}
+.futuro{font-size:14px;color:var(--mute);border:1px dashed var(--line);border-radius:6px;padding:8px 10px;margin-top:6px}
+main{padding:32px clamp(18px,4vw,56px) 64px;max-width:900px;width:100%}
+.ruta{color:var(--mute);font-size:15px;margin:0 0 6px}
+main h2{font-size:clamp(26px,4vw,34px);margin:0 0 18px}
+.video{aspect-ratio:16/9;background:#0b1512;border-radius:8px;overflow:hidden;display:grid;place-items:center;color:#9fb5ad}
+.video iframe, .video video{width:100%;height:100%;display:block;border:0}
+.progreso{margin:18px 0}
+.progreso label{display:flex;justify-content:space-between;font-size:14px;color:var(--mute);margin-bottom:6px}
+.teoria{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px 22px;max-width:70ch}
+.teoria h3{font-size:18px;margin:0 0 8px}
+.teoria p{margin:0}
+.acciones{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+button.btn{font:600 16px "IBM Plex Sans",sans-serif;padding:11px 18px;border-radius:7px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer}
+@media (prefers-color-scheme:dark){button.btn{color:#08261c}}
+button.btn.sec{background:none;color:var(--acc)}
+button.btn:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.loader-pantalla { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; position: fixed; top: 0; left: 0; background: var(--bg); z-index: 999; }
+.spinner { border: 4px solid var(--track); border-top: 4px solid var(--acc); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@media(max-width:820px){.app{grid-template-columns:1fr}aside{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}}
+</style>
+</head>
+<body>
+
+<!-- PANTALLA DE CARGA Y VALIDACIÓN DE FIREBASE -->
+<div id="loader-seguridad" class="loader-pantalla">
+    <div class="spinner"></div>
+    <p style="font-size: 15px; font-weight: 600; color: var(--mute);">Verificando acceso al curso de Contabilidad... (versión 2)</p>
+</div>
+
+<!-- CONTENEDOR PRINCIPAL DEL CURSO (Oculto hasta validar) -->
+<div class="app" id="app-curso" style="display: none;">
+  <aside aria-label="Índice del curso">
+    <p style="margin:0 0 14px;font-size:14px"><a href="index.html" style="color:var(--acc)">← Mis cursos</a> &nbsp;·&nbsp; <a href="#" id="cerrarSesion" style="color:var(--acc)">Cerrar sesión</a></p>
+    <h1 id="tituloCurso"></h1>
+    <div class="bar"><i id="barTotal"></i></div>
+    <p class="total" id="txtTotal"></p>
+    <nav id="indice"></nav>
+  </aside>
+  <main id="leccion" aria-live="polite"></main>
+</div>
+
+<!-- SDKs de Firebase (Compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<script>
+/* =====================================================
+   CONFIGURACIÓN Y SEGURIDAD DE FIREBASE
+   ===================================================== */
+const firebaseConfig = {
+    apiKey: "AIzaSyAbHMbkIZi7_2zh1tkl2rVopAr0bsAzcfU",
+    authDomain: "academiavadillo.firebaseapp.com",
+    projectId: "academiavadillo",
+    storageBucket: "academiavadillo.firebasestorage.app",
+    messagingSenderId: "105199417873",
+    appId: "1:105199417873:web:519b1901bb35acf3390fb0"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const CURSO_ACTUAL = "contabilidad"; // Identificador registrado en Firestore
+
+auth.onAuthStateChanged(async (user) => {
+    if (!user) { window.location.href = "index.html"; return; }
+    const email = (user.email || "").trim().toLowerCase();
+    try {
+        // El documento debe llamarse EXACTAMENTE como el correo (en minúsculas)
+        let snap = await db.collection("alumnos").doc(email).get();
+        if (!snap.exists && user.email !== email) snap = await db.collection("alumnos").doc(user.email).get();
+        const d = snap.exists ? snap.data() : null;
+        const cursos = d && Array.isArray(d.cursos) ? d.cursos.map(c => String(c).trim().toLowerCase()) : [];
+        if (cursos.includes(CURSO_ACTUAL)) {
+            document.getElementById('loader-seguridad').style.display = 'none';
+            document.getElementById('app-curso').style.display = 'grid';
+            inicializarSistemaCurso();
+        } else {
+            const motivo = !snap.exists
+                ? 'No existe el registro "alumnos/' + email + '" en Firestore.'
+                : 'El registro existe, pero el campo "cursos" no es una lista que incluya "' + CURSO_ACTUAL + '".';
+            await auth.signOut();   // evita el bucle login <-> curso
+            alert("No tienes una inscripción activa para este curso.\n\n" + motivo);
+            window.location.href = "index.html";
+        }
+    } catch (error) {
+        console.error("Error al verificar permisos:", error);
+        await auth.signOut();
+        alert("Ocurrió un error al validar tu acceso: " + (error.code || error.message));
+        window.location.href = "index.html";
+    }
+});
+
+/* =====================================================
+   LÓGICA DEL CURSO Y RENDERIZADO (Diseño original)
+   ===================================================== */
+function inicializarSistemaCurso() {
+    const CURSO = {
+      titulo: "Contabilidad Básica",
+      modulos: [
+        {
+          id: "m1",
+          titulo: "Módulo 1: Fundamentos Contables",
+          lecciones: [
+            { id: "1-1", titulo: "Lección 1.1: Conceptos Básicos y Naturaleza Contable",
+              descripcion: "La contabilidad es el sistema que registra, clasifica y resume las operaciones económicas de una entidad para tomar decisiones. Veremos qué es, para qué sirve y quiénes usan su información.",
+              video: "https://www.vadillo.online/5f6432a4", duracion: "" },
+            { id: "1-2", titulo: "Lección 1.2: La Ecuación Patrimonial (Activo, Pasivo y Patrimonio)",
+              descripcion: "Todo lo que una empresa tiene (activo) se financia con deudas (pasivo) o con aportes de sus dueños (patrimonio): Activo = Pasivo + Patrimonio. Esta igualdad es la base de todo registro contable.",
+              video: "https://www.vadillo.online/5f6432a4-fe34b91a", duracion: "" }
+          ]
+        },
+        {
+          id: "m2",
+          titulo: "Módulo 2: Registro de Operaciones",
+          lecciones: [
+            { id: "2-1", titulo: "Lección 2.1: Libro Diario y Libro Mayor",
+              descripcion: "El Libro Diario registra las operaciones en orden cronológico; el Libro Mayor las agrupa por cuenta. Practicaremos el paso de uno a otro con ejemplos.",
+              video: "https://www.vadillo.online/5f6432a4-fe34b91a-23b58a5f", duracion: "" },
+            { id: "2-2", titulo: "Lección 2.2: Clasificación de las Cuentas", descripcion: "Las cuentas se organizan en cinco grandes grupos: Activo, Pasivo, Patrimonio, Ingresos y Gastos. Aprenderás a identificar a qué grupo pertenece cada cuenta antes de registrarla.",
+              video: "https://www.vadillo.online/5f6432a4-fe34b91a-23b58a5f-551f65ef", duracion: "" },
+            { id: "2-3", titulo: "Lección 2.3: Ejercicios", descripcion: "Práctica guiada para aplicar lo visto en el módulo.",
+              video: "https://www.vadillo.online/5f6432a4-fe34b91a-23b58a5f-551f65ef-d6890bc0", duracion: "" }
+          ]
+        },
+        {
+          id: "m3",
+          titulo: "Evaluación final",
+          lecciones: [ { id: "quiz", titulo: "Quiz del curso", descripcion: "", video: "", proximamente: true } ]
+        }
+      ]
+    };
+
+    const KEY = "progreso-contabilidad-basica";
+    const todas = CURSO.modulos.flatMap(m => m.lecciones.filter(l => !l.proximamente).map(l => ({...l, modulo: m.titulo})));
+    let prog = {};
+    try { prog = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+    const guardar = () => { try { localStorage.setItem(KEY, JSON.stringify(prog)); } catch (e) {} };
+    const pctDe = id => (prog[id] && prog[id].pct) || 0;
+    const hecha = id => !!(prog[id] && prog[id].done);
+    const $ = id => document.getElementById(id);
+
+    function dibujarIndice(actual) {
+      $("tituloCurso").textContent = CURSO.titulo;
+      $("indice").innerHTML = CURSO.modulos.map(m => `
+        <div class="mod"><h3>${m.titulo}</h3>
+        ${m.lecciones.map(l => l.proximamente ? `<div class="futuro">${l.titulo} (próximamente)</div>` : `
+          <button class="lec ${hecha(l.id) ? "done" : ""}" data-id="${l.id}" ${l.id === actual ? 'aria-current="true"' : ""}>
+            ${l.titulo}<div class="bar mini"><i style="width:${hecha(l.id) ? 100 : pctDe(l.id)}%"></i></div>
+          </button>`).join("")}
+        </div>`).join("");
+      const hechas = todas.filter(l => hecha(l.id)).length;
+      const pct = Math.round(hechas / todas.length * 100);
+      $("barTotal").style.width = pct + "%";
+      $("txtTotal").textContent = `${hechas} de ${todas.length} lecciones completadas (${pct}%)`;
+    }
+
+    function mostrar(id) {
+      const i = Math.max(0, todas.findIndex(l => l.id === id));
+      const l = todas[i];
+      const p = hecha(l.id) ? 100 : pctDe(l.id);
+      
+      // Renderizado del reproductor (soporta enlaces de Systeme.io con iframe o videos directos .mp4)
+      let contenidoVideo = "<span>El video de esta lección estará disponible pronto.</span>";
+      const esArchivo = /\.(mp4|webm|ogg)(\?|#|$)/i.test(l.video || "");
+      if (l.video) {
+          contenidoVideo = esArchivo
+            ? `<video id="vid" controls preload="metadata" playsinline controlsList="nodownload" src="${l.video}"></video>`
+            : `<iframe src="${l.video}" title="Video de la lección" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen loading="lazy"></iframe>`;
+      }
+      const aviso = (l.video && !esArchivo) ? `<p style="font-size:14px;color:var(--mute);margin:8px 0 0">¿No carga el video? <a href="${l.video}" target="_blank" rel="noopener" style="color:var(--acc)">Ábrelo en una pestaña nueva</a> y marca la lección como completada al terminar.</p>` : "";
+
+      $("leccion").innerHTML = `
+        <p class="ruta">${l.modulo}${l.duracion ? " · " + l.duracion : ""}</p>
+        <h2>${l.titulo}</h2>
+        <div class="video">${contenidoVideo}</div>${aviso}
+        <div class="progreso"><label><span>Progreso de la lección</span><span id="pTxt">${p}%</span></label>
+          <div class="bar"><i id="pBar" style="width:${p}%"></i></div></div>
+        <section class="teoria"><h3>De qué trata</h3><p>${l.descripcion}</p></section>
+        <div class="acciones">
+          <button class="btn sec" id="ant" ${i === 0 ? "disabled" : ""}>Lección anterior</button>
+          <button class="btn" id="hecha">${hecha(l.id) ? "Lección completada" : "Marcar como completada"}</button>
+          <button class="btn sec" id="sig" ${i === todas.length - 1 ? "disabled" : ""}>Siguiente lección</button>
+        </div>`;
+      dibujarIndice(l.id);
+
+      const poner = v => { $("pBar").style.width = v + "%"; $("pTxt").textContent = v + "%"; };
+      const vid = $("vid");
+      if (vid) {
+          vid.addEventListener("timeupdate", () => {
+            if (!vid.duration || hecha(l.id)) return;
+            const v = Math.round(vid.currentTime / vid.duration * 100);
+            if (v > pctDe(l.id)) { prog[l.id] = {pct: v, done: v >= 95}; guardar(); poner(v); if (v >= 95) dibujarIndice(l.id); }
+          });
+      }
+      
+      $("hecha").onclick = () => { prog[l.id] = {pct: 100, done: true}; guardar(); mostrar(l.id); };
+      $("ant").onclick = () => { location.hash = todas[i - 1].id; };
+      $("sig").onclick = () => { location.hash = todas[i + 1].id; };
+    }
+
+    $("indice").addEventListener("click", e => {
+      const b = e.target.closest(".lec"); if (b) location.hash = b.dataset.id;
+    });
+    window.addEventListener("hashchange", () => mostrar(location.hash.slice(1)));
+    mostrar(location.hash.slice(1) || todas[0].id);
+}
+
+document.getElementById('cerrarSesion').addEventListener('click', function (e) {
+    e.preventDefault();
+    auth.signOut().then(function () { window.location.href = "index.html"; });
+});
+</script>
+</body>
+</html>
